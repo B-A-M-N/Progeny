@@ -1,0 +1,32 @@
+services:
+  # Local Search Engine
+  searxng:
+    image: searxng/searxng:latest
+    container_name: progeny-searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./ai-companion/searxng_server:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    restart: always
+
+  # Local Web Crawler (Required for Lesson Planning)
+  firecrawl:
+    image: mendable/firecrawl:latest
+    container_name: progeny-firecrawl
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - SELF_HOSTED=true
+    restart: always
+
+  # Optional: Ollama (if not running on host)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: progeny-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ./ollama_data:/root/.ollama

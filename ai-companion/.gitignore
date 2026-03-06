@@ -1,0 +1,21 @@
+# Session Data (Sensitive/Large)
+.gemini_security/
+data/session_state.json
+data/session_logs/
+data/response.wav
+data/test_capture.jpg
+
+# Python (Standard)
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Models (Download locally)
+ai-companion/data/assets/kokoro.onnx
+ai-companion/data/assets/voices.json
+ai-companion/data/assets/voices.npy
+
+# Test artifacts
+test_second_brain.db
+test_struggle.db

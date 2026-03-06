@@ -1,0 +1,1 @@
+Bitling/assets/*.onnx\nBitling/assets/*.npy\nai-companion/data/assets/*.onnx\nai-companion/data/assets/*.npy\n.gemini_security/\ndata/session_state.json\n__pycache__/\nvenv/

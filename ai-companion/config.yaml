@@ -1,0 +1,56 @@
+system:
+  ip_address: "0.0.0.0"
+  port: 8000
+  loop_interval_seconds: 5
+
+hardware:
+  gpu_vram_gb: 4
+  cpu_threads: 12
+
+models:
+  vision: "moondream:latest"   # or "qwen3-vl:2b" / "moondream"
+  agent: "qwen2.5:0.5b"        # Small, fast model for logic
+  tts: "kokoro-82m"
+
+cast:
+  device_name: "Google Home Mini"
+  host_ip: "10.9.66.93"  # Update this to your Mini's IP
+
+child:
+  name: "Son"
+  age: 5
+  interests:
+    - "trains"
+    - "dinosaurs"
+    - "cars"
+    - "building"
+
+parent_controls:
+  max_speech_per_minute: 4
+  blocked_topics:
+    - "scary"
+    - "violence"
+    - "death"
+    - "news"
+  teaching_goals:
+    - "counting"
+    - "colors"
+    - "turn-taking"
+    - "emotion labeling"
+  calming_strategies:
+    - "breathing"
+    - "music"
+    - "familiar phrases"
+
+# The agent will only choose from these approved actions
+allowed_actions:
+  - "comment_observation"
+  - "ask_simple_question"
+  - "offer_choice"
+  - "praise_attempt"
+  - "suggest_break"
+  - "start_micro_lesson"
+  - "retrieve_content"
+  - "plan_lesson"
+  - "play_audio"
+  - "notify_parent"

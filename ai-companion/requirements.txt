@@ -1,0 +1,15 @@
+# Standard Libs
+requests
+pyyaml
+opencv-python
+numpy
+
+# AI Core
+ollama
+fastembed
+
+# Audio / Casting
+pychromecast
+flask
+transitions
+Kokoro-82M # If using pip version, otherwise link locally
