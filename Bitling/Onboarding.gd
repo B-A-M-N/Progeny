@@ -114,12 +114,16 @@ func _handle_message(json_str: String):
 		"init":
 			_set_status("Brain connected. Ready for onboarding.")
 			socket.send_text(JSON.stringify({"type": "get_world_state"}))
+			var pad_url = str(data.get("writing_pad_url", ""))
+			if pad_url != "":
+				parent_summary.text = "Writing Pad URL (tablet/kindle):\n" + pad_url
 		"world_state":
 			var trust = data.get("trust_model", {})
 			var world = data.get("world_anchor", {})
 			var stage = str(trust.get("stage", "safety"))
 			var location = str(world.get("location", "world")).replace("_", " ")
-			parent_summary.text = "Current World: " + location + "\nTrust stage: " + stage
+			var pad_url = str(data.get("writing_pad_url", ""))
+			parent_summary.text = "Current World: " + location + "\nTrust stage: " + stage + "\nWriting Pad: " + pad_url
 		"onboarding_script":
 			script_items = data.get("items", [])
 			script_index = 0

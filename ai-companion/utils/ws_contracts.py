@@ -16,6 +16,7 @@ class WSContracts:
     SCHEMA_BY_TYPE = {
         "get_onboarding_script": "get_onboarding_script.schema.json",
         "get_world_state": "get_world_state.schema.json",
+        "get_writing_pad_url": "get_writing_pad_url.schema.json",
         "set_parent_baseline": "set_parent_baseline.schema.json",
         "onboarding_event": "onboarding_event.schema.json",
         "finish_onboarding": "finish_onboarding.schema.json",

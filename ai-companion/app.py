@@ -1,5 +1,6 @@
 import time
 import os
+import socket
 import asyncio
 import json
 import yaml
@@ -113,6 +114,22 @@ class ProgenyEngine:
         if neuro:
             return neuro
         return self.config.get('child', {}).get('neurodiversity_profile', {})
+
+    def get_writing_pad_url(self):
+        port = int(self.writing_server_port or 5000)
+        ip = None
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            ip = None
+        if not ip:
+            ip = self.config.get('system', {}).get('ip_address', '127.0.0.1')
+        if ip in ("0.0.0.0", "", None):
+            ip = "127.0.0.1"
+        return f"http://{ip}:{port}"
 
     def _update_adaptive_signal(self, key, value):
         # Accept normalized signals [0..1] and smooth with EMA.
@@ -229,6 +246,7 @@ class ProgenyEngine:
                 "world_anchor": world_anchor,
                 "trust_model": trust_model,
                 "return_greeting": self.onboarding.get_return_greeting(),
+                "writing_pad_url": self.get_writing_pad_url(),
             }))
             
             async for message in websocket:
@@ -343,7 +361,13 @@ class ProgenyEngine:
                         "type": "world_state",
                         "world_anchor": profile.get("world_anchor", {}),
                         "trust_model": profile.get("trust", {}),
-                        "return_greeting": self.onboarding.get_return_greeting()
+                        "return_greeting": self.onboarding.get_return_greeting(),
+                        "writing_pad_url": self.get_writing_pad_url(),
+                    }))
+                elif msg_type == "get_writing_pad_url":
+                    await websocket.send(json.dumps({
+                        "type": "writing_pad_info",
+                        "url": self.get_writing_pad_url()
                     }))
                 elif msg_type == "world_action":
                     action = data.get("action", "")

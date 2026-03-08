@@ -79,6 +79,7 @@ Client -> Brain:
 - `get_media_probe_pack`
 - `regulation_signal`
 - `get_world_state`
+- `get_writing_pad_url`
 - `world_action`
 
 Brain -> Client:
@@ -96,6 +97,7 @@ Brain -> Client:
 - `adaptive_state`
 - `trust_stage_update`
 - `world_state`
+- `writing_pad_info`
 - `lesson_plan`
 - `speak`
 

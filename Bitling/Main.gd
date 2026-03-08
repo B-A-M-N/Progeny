@@ -20,6 +20,7 @@ var time_passed = 0.0
 var neuro_profile = {}
 var trust_model = {}
 var world_anchor = {}
+var writing_pad_url = ""
 var current_action = ""
 var action_time = 0.0
 var is_dragging = false
@@ -30,7 +31,9 @@ const MENU_TALK := 1
 const MENU_REGENERATE := 2
 const MENU_PIN_TOGGLE := 3
 const MENU_HIDE_CHAT := 4
-const MENU_QUIT := 5
+const MENU_OPEN_PAD := 5
+const MENU_SHOW_PAD_URL := 6
+const MENU_QUIT := 7
 
 func _ready():
 	_configure_overlay_window()
@@ -59,6 +62,8 @@ func _setup_ui():
 		overlay_menu.add_item("Regenerate Avatar", MENU_REGENERATE)
 		overlay_menu.add_item("Unpin (Click-through OFF)", MENU_PIN_TOGGLE)
 		overlay_menu.add_item("Hide Chat", MENU_HIDE_CHAT)
+		overlay_menu.add_item("Open Writing Pad", MENU_OPEN_PAD)
+		overlay_menu.add_item("Show Writing URL", MENU_SHOW_PAD_URL)
 		overlay_menu.add_separator()
 		overlay_menu.add_item("Quit", MENU_QUIT)
 		overlay_menu.id_pressed.connect(_on_menu_id_pressed)
@@ -192,6 +197,10 @@ func _on_menu_id_pressed(id: int):
 		MENU_HIDE_CHAT:
 			if chat_panel:
 				chat_panel.visible = false
+		MENU_OPEN_PAD:
+			_open_writing_pad()
+		MENU_SHOW_PAD_URL:
+			_show_writing_pad_url()
 		MENU_QUIT:
 			get_tree().quit()
 
@@ -217,6 +226,7 @@ func handle_message(json_str: String):
 				neuro_profile = data.get("neurodiversity", {})
 				trust_model = data.get("trust_model", {})
 				world_anchor = data.get("world_anchor", {})
+				writing_pad_url = str(data.get("writing_pad_url", ""))
 				apply_sensory_settings()
 				var name = data.get("profile", {}).get("name", "Bitling")
 				var ob = data.get("open_brain", {})
@@ -229,6 +239,8 @@ func handle_message(json_str: String):
 					status_label.text = "HELLO, I AM " + name.to_upper() + " | " + ob_text + " | TRUST: " + stage.to_upper() + " | " + location.to_upper()
 				if chat_log and greeting != "":
 					chat_log.text += "\n[b]Bitling:[/b] " + greeting
+				if chat_log and writing_pad_url != "":
+					chat_log.text += "\n[i]Writing pad:[/i] " + writing_pad_url
 				print("[OpenBrain] ", ob_text, " detail=", str(ob.get("detail", "")))
 				
 			"speak":
@@ -272,6 +284,9 @@ func handle_message(json_str: String):
 			"world_state":
 				world_anchor = data.get("world_anchor", world_anchor)
 				trust_model = data.get("trust_model", trust_model)
+				var pad_url = str(data.get("writing_pad_url", ""))
+				if pad_url != "":
+					writing_pad_url = pad_url
 				var line = _world_status_line()
 				if status_label:
 					status_label.text = line.to_upper()
@@ -284,6 +299,9 @@ func handle_message(json_str: String):
 				if chat_log:
 					var stage2 = str(trust_model.get("stage", "safety"))
 					chat_log.text += "\n[i]Trust grew to:[/i] " + stage2
+			"writing_pad_info":
+				writing_pad_url = str(data.get("url", writing_pad_url))
+				_show_writing_pad_url()
 
 func trigger_action(action_name: String, duration: float):
 	current_action = action_name
@@ -364,6 +382,29 @@ func _world_status_line() -> String:
 	if typeof(companions) == TYPE_ARRAY and companions.size() > 0:
 		c = " | companions: " + ", ".join(companions)
 	return "Trust: " + stage + " | world: " + world_name + c
+
+func _open_writing_pad():
+	if writing_pad_url == "":
+		if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+			socket.send_text(JSON.stringify({"type": "get_writing_pad_url"}))
+		if status_label:
+			status_label.text = "REQUESTING WRITING PAD URL..."
+		return
+	OS.shell_open(writing_pad_url)
+	if status_label:
+		status_label.text = ("OPENED WRITING PAD: " + writing_pad_url).to_upper()
+
+func _show_writing_pad_url():
+	if writing_pad_url == "":
+		if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+			socket.send_text(JSON.stringify({"type": "get_writing_pad_url"}))
+		if status_label:
+			status_label.text = "WRITING PAD URL UNAVAILABLE"
+		return
+	if chat_log:
+		chat_log.text += "\n[i]Tablet/Kindle URL:[/i] " + writing_pad_url
+	if status_label:
+		status_label.text = ("WRITING PAD: " + writing_pad_url).to_upper()
 
 func trigger_visual_stim():
 	var tween = create_tween()

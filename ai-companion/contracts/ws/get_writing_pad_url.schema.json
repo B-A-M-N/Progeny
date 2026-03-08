@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/get_writing_pad_url.schema.json",
+  "title": "get_writing_pad_url",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "get_writing_pad_url" }
+  },
+  "additionalProperties": true
+}

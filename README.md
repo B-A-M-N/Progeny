@@ -117,6 +117,7 @@ This makes sessions feel like "welcome back to *our* world" rather than "start a
 
 The writing pad/tablet server lets kids draw/write in a low-pressure way.
 It tracks pressure/motor patterns and turns those into support signals.
+The overlay UI exposes the writing pad URL directly so a Kindle/tablet can join with minimal friction.
 
 This helps detect not just "can they do it," but "what made it harder" and "what helped them recover."
 
