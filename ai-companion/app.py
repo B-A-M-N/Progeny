@@ -104,6 +104,7 @@ class ProgenyEngine:
         self.active_media_sessions = {}
         self.signal_alpha = 0.25
         self.interest_history = deque(maxlen=12)
+        self.last_trust_stage = ""
 
     def get_active_neuro_profile(self):
         adapted = self.onboarding.get_or_init_profile()
@@ -199,6 +200,8 @@ class ProgenyEngine:
             gen_config = self.config.get('generation', {})
             neuro_profile = self.get_active_neuro_profile()
             adaptation = self.onboarding.get_or_init_profile()
+            world_anchor = adaptation.get("world_anchor", {})
+            trust_model = adaptation.get("trust", {})
             
             # Auto-detect if local is actually available
             is_local = self.creation_svc.is_local_available()
@@ -221,7 +224,10 @@ class ProgenyEngine:
                 "generation": {
                     "prefer_local": prefer_local,
                     "pollinations_active": not prefer_local
-                }
+                },
+                "world_anchor": world_anchor,
+                "trust_model": trust_model,
+                "return_greeting": self.onboarding.get_return_greeting(),
             }))
             
             async for message in websocket:
@@ -322,6 +328,24 @@ class ProgenyEngine:
                         "items": self.onboarding.get_session_script(),
                         "profile": self.onboarding.get_or_init_profile()
                     }))
+                elif msg_type == "get_world_state":
+                    profile = self.onboarding.get_or_init_profile()
+                    await websocket.send(json.dumps({
+                        "type": "world_state",
+                        "world_anchor": profile.get("world_anchor", {}),
+                        "trust_model": profile.get("trust", {}),
+                        "return_greeting": self.onboarding.get_return_greeting()
+                    }))
+                elif msg_type == "world_action":
+                    action = data.get("action", "")
+                    payload = data.get("payload", {})
+                    updated = self.onboarding.apply_world_action(action, payload)
+                    await websocket.send(json.dumps({
+                        "type": "world_state",
+                        "world_anchor": updated.get("world_anchor", {}),
+                        "trust_model": updated.get("trust", {}),
+                        "return_greeting": self.onboarding.get_return_greeting()
+                    }))
                 elif msg_type == "set_parent_baseline":
                     baseline = data.get("baseline", {})
                     profile = self.onboarding.apply_parent_baseline(baseline)
@@ -362,11 +386,14 @@ class ProgenyEngine:
                     session_id = str(data.get("session_id", "default"))
                     metrics = self.current_onboarding_session.get(session_id, {})
                     summary = self.onboarding.summarize_for_parent(metrics)
+                    profile = self.onboarding.get_or_init_profile()
                     await websocket.send(json.dumps({
                         "type": "onboarding_summary",
                         "session_id": session_id,
                         "summary": summary,
-                        "profile": self.onboarding.get_or_init_profile()
+                        "profile": profile,
+                        "world_anchor": profile.get("world_anchor", {}),
+                        "trust_model": profile.get("trust", {}),
                     }))
                 elif msg_type == "start_media_session":
                     session_id = str(data.get("session_id", f"media_{int(time.time())}"))
@@ -579,15 +606,31 @@ class ProgenyEngine:
                     switch_rate = switches / max(1, len(self.interest_history) - 1)
                     self._update_adaptive_signal("rapid_topic_switching", switch_rate)
                 live_state = self.onboarding.estimate_live_state(summary, self.recent_adaptive_signals)
+                trust_profile = self.onboarding.update_trust_from_live_state(live_state)
+                trust_model = trust_profile.get("trust", {})
+                world_anchor = trust_profile.get("world_anchor", {})
+                live_state["trust_stage"] = trust_model.get("stage", "safety")
+                live_state["trust_score"] = trust_model.get("score", 0.0)
                 adaptive_policy = self.onboarding.render_adaptive_policy(live_state)
                 summary_for_agent = dict(summary)
                 summary_for_agent["adaptive_state"] = live_state
                 summary_for_agent["adaptive_policy"] = adaptive_policy
+                summary_for_agent["trust_model"] = trust_model
+                summary_for_agent["world_anchor"] = world_anchor
                 await self.broadcast({
                     "type": "adaptive_state",
                     "state": live_state,
-                    "policy": adaptive_policy
+                    "policy": adaptive_policy,
+                    "trust_model": trust_model,
+                    "world_anchor": world_anchor
                 })
+                stage = str(trust_model.get("stage", ""))
+                if stage and stage != self.last_trust_stage:
+                    self.last_trust_stage = stage
+                    await self.broadcast({
+                        "type": "trust_stage_update",
+                        "trust_model": trust_model
+                    })
                 
                 if summary.get("visible_objects"):
                     for obj in summary["visible_objects"]:

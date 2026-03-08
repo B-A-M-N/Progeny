@@ -18,6 +18,8 @@ var send_button: Button
 var is_connected = false
 var time_passed = 0.0
 var neuro_profile = {}
+var trust_model = {}
+var world_anchor = {}
 var current_action = ""
 var action_time = 0.0
 var is_dragging = false
@@ -213,13 +215,20 @@ func handle_message(json_str: String):
 		match type:
 			"init":
 				neuro_profile = data.get("neurodiversity", {})
+				trust_model = data.get("trust_model", {})
+				world_anchor = data.get("world_anchor", {})
 				apply_sensory_settings()
 				var name = data.get("profile", {}).get("name", "Bitling")
 				var ob = data.get("open_brain", {})
 				var ob_ok = bool(ob.get("connected", false))
 				var ob_text = "OPEN BRAIN: " + ("CONNECTED" if ob_ok else "DISCONNECTED")
+				var greeting = str(data.get("return_greeting", ""))
+				var stage = str(trust_model.get("stage", "safety"))
+				var location = str(world_anchor.get("location", "world")).replace("_", " ")
 				if status_label:
-					status_label.text = "HELLO, I AM " + name.to_upper() + " | " + ob_text
+					status_label.text = "HELLO, I AM " + name.to_upper() + " | " + ob_text + " | TRUST: " + stage.to_upper() + " | " + location.to_upper()
+				if chat_log and greeting != "":
+					chat_log.text += "\n[b]Bitling:[/b] " + greeting
 				print("[OpenBrain] ", ob_text, " detail=", str(ob.get("detail", "")))
 				
 			"speak":
@@ -240,8 +249,9 @@ func handle_message(json_str: String):
 				var hook = str(lesson.get("hook", "Let's learn together."))
 				var facts = lesson.get("facts", [])
 				var activity = str(lesson.get("activity", "Let's try one tiny step."))
+				var mode = str(lesson.get("mode", "stabilize"))
 				if status_label:
-					status_label.text = ("LESSON: " + subject + " | " + hook).to_upper()
+					status_label.text = ("LESSON: " + subject + " | " + hook + " | MODE: " + mode).to_upper()
 				if chat_log:
 					var msg = "\n[b]Bitling Lesson (" + subject + "):[/b] " + hook
 					if typeof(facts) == TYPE_ARRAY and facts.size() > 0:
@@ -251,7 +261,29 @@ func handle_message(json_str: String):
 						if facts.size() > 2:
 							msg += "\n- " + str(facts[2])
 					msg += "\n[b]Activity:[/b] " + activity
+					msg += "\n[b]Mode:[/b] " + mode
 					chat_log.text += msg
+			"adaptive_state":
+				var st = data.get("state", {})
+				var stage = str(st.get("trust_stage", trust_model.get("stage", "safety")))
+				var mode = str(data.get("policy", {}).get("mode", "stabilize"))
+				if status_label:
+					status_label.text = ("MODE: " + mode + " | TRUST: " + stage).to_upper()
+			"world_state":
+				world_anchor = data.get("world_anchor", world_anchor)
+				trust_model = data.get("trust_model", trust_model)
+				var line = _world_status_line()
+				if status_label:
+					status_label.text = line.to_upper()
+				if chat_log:
+					var g = str(data.get("return_greeting", ""))
+					if g != "":
+						chat_log.text += "\n[b]Bitling:[/b] " + g
+			"trust_stage_update":
+				trust_model = data.get("trust_model", trust_model)
+				if chat_log:
+					var stage2 = str(trust_model.get("stage", "safety"))
+					chat_log.text += "\n[i]Trust grew to:[/i] " + stage2
 
 func trigger_action(action_name: String, duration: float):
 	current_action = action_name
@@ -323,6 +355,15 @@ func apply_sensory_settings():
 			light.energy = 2.0
 	
 	print("Sensory settings applied: ", visual_sens, " | ", vibe)
+
+func _world_status_line() -> String:
+	var stage = str(trust_model.get("stage", "safety"))
+	var world_name = str(world_anchor.get("location", "world")).replace("_", " ")
+	var companions = world_anchor.get("companions", [])
+	var c = ""
+	if typeof(companions) == TYPE_ARRAY and companions.size() > 0:
+		c = " | companions: " + ", ".join(companions)
+	return "Trust: " + stage + " | world: " + world_name + c
 
 func trigger_visual_stim():
 	var tween = create_tween()

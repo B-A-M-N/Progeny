@@ -64,14 +64,25 @@ The first session is designed as a relationship-building flow, not an assessment
 ## 3) Live Neuroadaptive Teaching
 
 Bitling continuously adapts to the child’s *current* state.
-It does not only ask "what topic?" — it asks "what is this child ready for right now?"
+It does not only ask "what topic?" — it asks "what is this child ready for right now, and what keeps them regulated?"
+
+Three cooperating engines run together:
+
+- Interest Engine (motivation and topic anchoring)
+- Regulation Engine (overload detection + pacing/sensory shifts)
+- Learning Engine (challenge and scaffolding)
 
 Teaching modes:
 
+- `explore`
+- `engage`
 - `advance`
+- `practice`
 - `stabilize`
 - `repair`
 - `recover`
+- `rest`
+- `co_play`
 
 So when overload rises, Bitling reduces demand instead of pushing harder.
 
@@ -86,14 +97,28 @@ Lessons are generated live from:
 
 The content is dynamic, but internally structured so the app stays reliable.
 
-## 5) Writing + Fine-Motor Support
+## 5) Persistent World + Trust Growth
+
+Bitling is not meant to feel like opening a blank worksheet every time.
+It keeps a persistent world with places, companions, objects, events, and missions.
+It also tracks trust stages over time:
+
+- `safety`
+- `familiarity`
+- `rapport`
+- `collaboration`
+- `attachment`
+
+This makes sessions feel like "welcome back to *our* world" rather than "start another task."
+
+## 6) Writing + Fine-Motor Support
 
 The writing pad/tablet server lets kids draw/write in a low-pressure way.
 It tracks pressure/motor patterns and turns those into support signals.
 
 This helps detect not just "can they do it," but "what made it harder" and "what helped them recover."
 
-## 6) Media + Attention Loop
+## 7) Media + Attention Loop
 
 Watching content is optional, but tracked as an attention/comprehension signal.
 Short post-watch probes (choice/drawing/co-play prompts) help estimate:
@@ -108,6 +133,7 @@ Short post-watch probes (choice/drawing/co-play prompts) help estimate:
 - Creator + avatar generation flow
 - Onboarding scene in Godot
 - Adaptive profile persistence and live updates
+- Trust-stage updates and persistent world anchors
 - Dynamic lesson generation with adaptive context
 - Writing telemetry feeding adaptation
 - Optional media session/probe tracking

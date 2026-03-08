@@ -26,6 +26,9 @@ class LessonPlanService:
         print(f"[LessonPlanner] Starting {quality} quality research on '{subject}'...")
         media_insight = self.memory.get_media_effectiveness(topic=subject) if self.memory else {}
         learning_ctx = self.memory.get_recent_learning_context(subject=subject, window_seconds=7200) if self.memory else {}
+        adaptation = self.memory.get_adaptation_profile() if self.memory else {}
+        world_anchor = (adaptation or {}).get("world_anchor", {})
+        trust_model = (adaptation or {}).get("trust", {})
         
         # 1. Scaled Search (Adjust limits based on quality)
         search_limit = 3 if quality == "high" else (1 if quality == "medium" else 0)
@@ -86,6 +89,8 @@ class LessonPlanService:
             f"RECENT LEARNING CONTEXT (important): {json.dumps(learning_ctx)}\n\n"
             f"LIVE STATE: {json.dumps(live_state or {})}\n"
             f"ADAPTIVE POLICY: {json.dumps(adaptive_policy or {})}\n"
+            f"TRUST MODEL: {json.dumps(trust_model)}\n"
+            f"WORLD ANCHOR: {json.dumps(world_anchor)}\n"
             f"CURRENT MODE: {mode}\n\n"
             f"NEURODIVERSITY RULES: {neuro_rules}\n\n"
             "TASK: Return ONLY JSON with keys:\n"
@@ -101,6 +106,8 @@ class LessonPlanService:
             "Behavior rules:\n"
             "- Keep language simple and short.\n"
             "- Respect CURRENT MODE when choosing activity/demand.\n"
+            "- If WORLD ANCHOR has a location/companions, frame hook/activity inside that world.\n"
+            "- If TRUST MODEL stage is safety/familiarity, use lower-demand co-play language.\n"
             "- facts must be exactly 3 entries.\n"
             "- next_probe must be optional and low-pressure.\n"
             "- Avoid clinical/diagnostic language."

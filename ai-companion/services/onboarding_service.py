@@ -120,6 +120,127 @@ class OnboardingService:
             "starter_plan_7d": plan
         }
 
+    def get_world_anchor(self):
+        profile = self.get_or_init_profile()
+        return deepcopy(profile.get("world_anchor", self._default_world_anchor()))
+
+    def get_trust_model(self):
+        profile = self.get_or_init_profile()
+        return deepcopy(profile.get("trust", self._default_trust_model()))
+
+    def get_return_greeting(self):
+        world = self.get_world_anchor()
+        trust = self.get_trust_model()
+        place = str(world.get("location", "our world")).replace("_", " ")
+        stage = str(trust.get("stage", "safety"))
+        events = world.get("events", [])
+        if events:
+            latest = str(events[-1].get("text", "something new happened"))
+            return f"Welcome back to {place}. Since last time: {latest}"
+        if stage in ("collaboration", "attachment"):
+            return f"Welcome back to {place}. I kept things ready for us."
+        return f"Welcome to {place}. Want to build it together?"
+
+    def apply_world_action(self, action, payload=None):
+        current = self.get_or_init_profile()
+        out = deepcopy(current)
+        world = out.setdefault("world_anchor", self._default_world_anchor())
+        p = payload or {}
+        a = str(action or "").strip().lower()
+        now = time.time()
+
+        if a == "set_location":
+            loc = str(p.get("location", "")).strip()
+            if loc:
+                world["location"] = loc
+        elif a == "add_companion":
+            name = str(p.get("name", "")).strip()
+            if name and name not in world["companions"]:
+                world["companions"].append(name)
+        elif a == "collect_item":
+            key = str(p.get("item", "")).strip()
+            qty = int(p.get("quantity", 1) or 1)
+            if key:
+                world["collected_items"][key] = int(world["collected_items"].get(key, 0)) + max(1, qty)
+        elif a == "unlock_area":
+            area = str(p.get("area", "")).strip()
+            if area and area not in world["unlocked_areas"]:
+                world["unlocked_areas"].append(area)
+        elif a == "name_entity":
+            slot = str(p.get("slot", "")).strip()
+            name = str(p.get("name", "")).strip()
+            if slot and name:
+                world["named_entities"][slot] = name
+        elif a == "add_event":
+            txt = str(p.get("text", "")).strip()
+            if txt:
+                world["events"].append({"ts": now, "text": txt})
+                world["events"] = world["events"][-40:]
+        elif a == "add_mission":
+            mission = str(p.get("mission", "")).strip()
+            if mission and mission not in world["missions"]:
+                world["missions"].append(mission)
+        elif a == "complete_mission":
+            mission = str(p.get("mission", "")).strip()
+            if mission in world["missions"]:
+                world["missions"].remove(mission)
+                world["events"].append({"ts": now, "text": f"We completed: {mission}"})
+                world["events"] = world["events"][-40:]
+
+        world["updated_at"] = now
+        out["updated_at"] = now
+        out["source"] = "world_action"
+        self.memory.upsert_adaptation_profile(out, source="world_action")
+        return out
+
+    def update_trust_from_live_state(self, live_state):
+        current = self.get_or_init_profile()
+        out = deepcopy(current)
+        trust = out.setdefault("trust", self._default_trust_model())
+        st = live_state or {}
+        now = time.time()
+
+        stage = str(trust.get("stage", "safety"))
+        score = self._clamp(float(trust.get("score", 0.1)))
+
+        engagement = str(st.get("engagement", "disengaged"))
+        frustration = str(st.get("frustration", "none"))
+        regulation = str(st.get("regulation", "regulated"))
+        mode = self.select_mode(st)
+
+        delta = 0.0
+        if engagement in ("steady", "high"):
+            delta += 0.03
+        if mode in ("co_play", "engage", "practice", "advance"):
+            delta += 0.03
+        if frustration in ("moderate", "acute") or regulation == "dysregulated":
+            delta -= 0.04
+        if mode in ("recover", "rest"):
+            delta -= 0.02
+
+        score = self._clamp(score * 0.98 + (score + delta) * 0.02)
+        next_stage = self._trust_stage_from_score(score)
+        if self._trust_rank(next_stage) > self._trust_rank(stage):
+            stage = next_stage
+        elif self._trust_rank(stage) - self._trust_rank(next_stage) >= 2:
+            stage = next_stage
+
+        trust["score"] = round(score, 4)
+        trust["stage"] = stage
+        trust["updated_at"] = now
+        trust.setdefault("history", []).append({
+            "ts": now,
+            "stage": stage,
+            "score": round(score, 4),
+            "mode": mode
+        })
+        trust["history"] = trust["history"][-120:]
+
+        out["updated_at"] = now
+        out["source"] = "trust_runtime"
+        self.memory.upsert_adaptation_profile(out, source="trust_runtime")
+        return out
+
     def estimate_live_state(self, state_summary, recent_signals=None):
         s = state_summary or {}
         sig = recent_signals or {}
@@ -449,4 +570,48 @@ class OnboardingService:
             "updated_at": time.time(),
             "policy": {},
             "neurodiversity_profile": {},
+            "trust": self._default_trust_model(),
+            "world_anchor": self._default_world_anchor(),
         }
+
+    def _default_world_anchor(self):
+        return {
+            "location": "space_station",
+            "companions": ["bitling"],
+            "collected_items": {},
+            "unlocked_areas": ["hangar"],
+            "named_entities": {},
+            "missions": [],
+            "events": [],
+            "updated_at": time.time(),
+        }
+
+    def _default_trust_model(self):
+        return {
+            "stage": "safety",
+            "score": 0.12,
+            "updated_at": time.time(),
+            "history": [],
+        }
+
+    def _trust_stage_from_score(self, score):
+        s = self._clamp(score)
+        if s < 0.20:
+            return "safety"
+        if s < 0.40:
+            return "familiarity"
+        if s < 0.60:
+            return "rapport"
+        if s < 0.80:
+            return "collaboration"
+        return "attachment"
+
+    def _trust_rank(self, stage):
+        order = {
+            "safety": 0,
+            "familiarity": 1,
+            "rapport": 2,
+            "collaboration": 3,
+            "attachment": 4,
+        }
+        return int(order.get(str(stage), 0))

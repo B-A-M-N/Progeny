@@ -113,6 +113,13 @@ func _handle_message(json_str: String):
 	match str(data.get("type", "")):
 		"init":
 			_set_status("Brain connected. Ready for onboarding.")
+			socket.send_text(JSON.stringify({"type": "get_world_state"}))
+		"world_state":
+			var trust = data.get("trust_model", {})
+			var world = data.get("world_anchor", {})
+			var stage = str(trust.get("stage", "safety"))
+			var location = str(world.get("location", "world")).replace("_", " ")
+			parent_summary.text = "Current World: " + location + "\nTrust stage: " + stage
 		"onboarding_script":
 			script_items = data.get("items", [])
 			script_index = 0
@@ -130,7 +137,11 @@ func _handle_message(json_str: String):
 			var strengths = s.get("strengths", [])
 			var friction = s.get("friction_points", [])
 			var plan = s.get("starter_plan_7d", [])
-			parent_summary.text = "Session Summary\n\nStrengths:\n- " + "\n- ".join(strengths) + "\n\nFriction:\n- " + "\n- ".join(friction) + "\n\n7-Day Plan:\n- " + "\n- ".join(plan)
+			var trust = data.get("trust_model", {})
+			var world = data.get("world_anchor", {})
+			var stage = str(trust.get("stage", "safety"))
+			var location = str(world.get("location", "world")).replace("_", " ")
+			parent_summary.text = "Session Summary\nWorld: " + location + "\nTrust: " + stage + "\n\nStrengths:\n- " + "\n- ".join(strengths) + "\n\nFriction:\n- " + "\n- ".join(friction) + "\n\n7-Day Plan:\n- " + "\n- ".join(plan)
 			if tabs:
 				tabs.current_tab = 0
 
