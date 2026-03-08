@@ -105,7 +105,13 @@ class AgentService:
 
         adaptive_policy = state_summary.get("adaptive_policy", {}) if isinstance(state_summary, dict) else {}
         adaptive_mode = str(adaptive_policy.get("mode", "stabilize"))
+        first_contact = state_summary.get("first_contact", {}) if isinstance(state_summary, dict) else {}
+        first_contact_active = bool(first_contact.get("active", False))
         mode_rules = []
+        if first_contact_active:
+            mode_rules.append("FIRST_CONTACT_ACTIVE. Keep this to mystery/play/bonding. No testing language.")
+            mode_rules.append("FIRST_CONTACT_ACTIVE. Use observer-hook lines like 'Is someone there?' and invite child to help you.")
+            mode_rules.append("FIRST_CONTACT_ACTIVE. Keep turns very short and curiosity-led.")
         if adaptive_mode == "recover":
             mode_rules.append("MODE=RECOVER. Stop teaching pressure. Prioritize regulation and low-demand co-play.")
             mode_rules.append("Use very short prompts. Offer choice-based or drawing-first interaction.")
@@ -178,6 +184,10 @@ class AgentService:
             )
             
             result = result_obj.model_dump()
+            if first_contact_active and result.get("action") in ("plan_lesson", "retrieve_content"):
+                result["action"] = "comment_observation"
+                if not result.get("text"):
+                    result["text"] = "I think I found someone. Want to show me something cool?"
             
             # Fallback if model hallucinates an invalid action
             if result.get("action") not in self.allowed_actions:

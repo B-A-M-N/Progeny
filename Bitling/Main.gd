@@ -22,6 +22,7 @@ var trust_model = {}
 var world_anchor = {}
 var writing_pad_url = ""
 var writing_pad_qr_url = ""
+var first_contact = {}
 var current_action = ""
 var action_time = 0.0
 var is_dragging = false
@@ -237,6 +238,7 @@ func handle_message(json_str: String):
 				world_anchor = data.get("world_anchor", {})
 				writing_pad_url = str(data.get("writing_pad_url", ""))
 				writing_pad_qr_url = str(data.get("writing_pad_qr_url", ""))
+				first_contact = data.get("first_contact", {})
 				apply_sensory_settings()
 				var name = data.get("profile", {}).get("name", "Bitling")
 				var ob = data.get("open_brain", {})
@@ -249,6 +251,8 @@ func handle_message(json_str: String):
 					status_label.text = "HELLO, I AM " + name.to_upper() + " | " + ob_text + " | TRUST: " + stage.to_upper() + " | " + location.to_upper()
 				if chat_log and greeting != "":
 					chat_log.text += "\n[b]Bitling:[/b] " + greeting
+				if chat_log and bool(first_contact.get("active", false)):
+					chat_log.text += "\n[i]First Contact:[/i] Mystery/play mode is active (short session)."
 				if chat_log and writing_pad_url != "":
 					chat_log.text += "\n[i]Writing pad:[/i] " + writing_pad_url
 				if chat_log and writing_pad_qr_url != "":
@@ -296,6 +300,7 @@ func handle_message(json_str: String):
 			"world_state":
 				world_anchor = data.get("world_anchor", world_anchor)
 				trust_model = data.get("trust_model", trust_model)
+				first_contact = data.get("first_contact", first_contact)
 				var pad_url = str(data.get("writing_pad_url", ""))
 				var pad_qr_url = str(data.get("writing_pad_qr_url", ""))
 				if pad_url != "":
@@ -318,6 +323,12 @@ func handle_message(json_str: String):
 				writing_pad_url = str(data.get("url", writing_pad_url))
 				writing_pad_qr_url = str(data.get("qr_url", writing_pad_qr_url))
 				_show_writing_pad_url()
+			"first_contact_completed":
+				var msg_fc = str(data.get("message", "Tomorrow we open a tiny portal together."))
+				if chat_log:
+					chat_log.text += "\n[b]Bitling:[/b] " + msg_fc
+				if status_label:
+					status_label.text = "FIRST CONTACT COMPLETE"
 
 func trigger_action(action_name: String, duration: float):
 	current_action = action_name

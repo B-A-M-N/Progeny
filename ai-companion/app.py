@@ -224,6 +224,7 @@ class ProgenyEngine:
             adaptation = self.onboarding.get_or_init_profile()
             world_anchor = adaptation.get("world_anchor", {})
             trust_model = adaptation.get("trust", {})
+            first_contact = adaptation.get("first_contact", {})
             
             # Auto-detect if local is actually available
             is_local = self.creation_svc.is_local_available()
@@ -252,6 +253,7 @@ class ProgenyEngine:
                 "return_greeting": self.onboarding.get_return_greeting(),
                 "writing_pad_url": self.get_writing_pad_url(),
                 "writing_pad_qr_url": self.get_writing_pad_qr_url(),
+                "first_contact": first_contact,
             }))
             
             async for message in websocket:
@@ -366,6 +368,7 @@ class ProgenyEngine:
                         "type": "world_state",
                         "world_anchor": profile.get("world_anchor", {}),
                         "trust_model": profile.get("trust", {}),
+                        "first_contact": profile.get("first_contact", {}),
                         "return_greeting": self.onboarding.get_return_greeting(),
                         "writing_pad_url": self.get_writing_pad_url(),
                         "writing_pad_qr_url": self.get_writing_pad_qr_url(),
@@ -679,14 +682,21 @@ class ProgenyEngine:
                 self.memory.record_event("perception", vision_desc, summary, None)
                 
                 if summary.get("child_present"):
+                    fc_profile = self.onboarding.get_first_contact()
+                    if bool(fc_profile.get("active", False)) and not fc_profile.get("started_at"):
+                        self.onboarding.update_first_contact(started=True, interaction=True)
+                    elif bool(fc_profile.get("active", False)):
+                        self.onboarding.update_first_contact(interaction=True)
                     await self.change_state(State.DECIDING)
                     interest = summary.get("current_interest", "trains")
                     brain_context = self.memory.search_knowledge(interest, top_k=2)
                     lesson_context = self.memory.get_lesson(interest)
                     profile = self.memory.get_tutor_profile()
                     learning_stage = self.memory.get_learning_stage()
+                    fc_profile = self.onboarding.get_first_contact()
 
                     active_neuro = self.get_active_neuro_profile()
+                    summary_for_agent["first_contact"] = fc_profile
                     decision = self.agent.get_response(
                         summary_for_agent,
                         vision_desc,
@@ -698,6 +708,13 @@ class ProgenyEngine:
                     )
                     action = decision.get("action", "comment_observation")
                     text = decision.get("text", "")
+
+                    if bool(fc_profile.get("active", False)):
+                        # During first contact, keep interactions playful and short.
+                        if action in ("plan_lesson", "retrieve_content"):
+                            action = "comment_observation"
+                        if not text:
+                            text = "Hello Earth friend. Can you show me something you like?"
 
                     await self.broadcast({"type": "action", "action": action})
 
@@ -743,6 +760,26 @@ class ProgenyEngine:
                         else:
                             print("[Engine] Throttling Lesson Plan - System Pegged")
                             text = "I'm looking forward to learning more about that soon!"
+
+                    # First-contact lifecycle: cap at 5 minutes and leave a return hook.
+                    if bool(fc_profile.get("active", False)):
+                        started_at = fc_profile.get("started_at")
+                        max_minutes = float(fc_profile.get("max_minutes", 5) or 5)
+                        elapsed = 0.0
+                        if started_at:
+                            elapsed = max(0.0, time.time() - float(started_at))
+                        if elapsed >= (max_minutes * 60.0):
+                            if not text:
+                                text = "Tomorrow I can open a tiny portal. Should we pick dragons or rockets first?"
+                            self.onboarding.apply_world_action(
+                                "add_event",
+                                {"text": "A tiny portal is ready for tomorrow's adventure."}
+                            )
+                            self.onboarding.update_first_contact(completed=True)
+                            await self.broadcast({
+                                "type": "first_contact_completed",
+                                "message": text
+                            })
 
                     elif action in ["ask_simple_question", "praise_attempt"]:
                          pass 

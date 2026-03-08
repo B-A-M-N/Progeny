@@ -8,19 +8,35 @@ class OnboardingService:
         self.config = config or {}
 
     def get_session_script(self):
+        profile = self.get_or_init_profile()
+        anchors = profile.get("interest_anchors", []) or []
+        primary_interest = str(anchors[0]).strip() if anchors else "space creatures"
         return [
-            {"id": "companion_choice", "prompt": "Every explorer needs a helper friend. Which one should join us?", "type": "choice", "skip_allowed": True},
-            {"id": "draw_interest", "prompt": "Can you show me something you really like?", "type": "drawing", "skip_allowed": True},
-            {"id": "show_faces", "prompt": "Can you show me a happy, tired, and silly face?", "type": "camera_play", "skip_allowed": True},
-            {"id": "fast_slow", "prompt": "Can you show me FAST drawing and then SLOW drawing?", "type": "drawing_pace", "skip_allowed": True},
-            {"id": "interest_fork", "prompt": "Dinosaurs or rockets? Ocean or space? Drawing or building?", "type": "choice", "skip_allowed": True},
-            {"id": "mini_challenge", "prompt": "Want to try something tiny together?", "type": "micro_task", "skip_allowed": True},
-            {"id": "recovery", "prompt": "Can you draw one big circle?", "type": "easy_success", "skip_allowed": True},
+            {"id": "observer_hook", "prompt": "Hello? Is someone there? I think I found a new friend.", "type": "mystery_intro", "skip_allowed": True},
+            {"id": "companion_choice", "prompt": "I am new here. Which helper should join us first?", "type": "choice", "skip_allowed": True},
+            {"id": "interest_bridge", "prompt": f"I heard Earth has amazing {primary_interest}. Can you show me your favorite one?", "type": "drawing", "skip_allowed": True},
+            {"id": "show_faces", "prompt": "I am still learning Earth feelings. Can you show me a happy and silly face?", "type": "camera_play", "skip_allowed": True},
+            {"id": "fast_slow", "prompt": "Want to help me test my speed scanner? Show FAST and then SLOW drawing.", "type": "drawing_pace", "skip_allowed": True},
+            {"id": "interest_fork", "prompt": "Should our world open dinosaurs, rockets, or ocean first?", "type": "choice", "skip_allowed": True},
+            {"id": "return_hook", "prompt": "Tomorrow I can open a tiny portal. What should appear first?", "type": "future_hook", "skip_allowed": True},
         ]
 
     def get_or_init_profile(self):
         existing = self.memory.get_adaptation_profile()
         if existing:
+            # Backfill newer keys for older saved profiles.
+            changed = False
+            if "first_contact" not in existing:
+                existing["first_contact"] = self._default_first_contact()
+                changed = True
+            if "trust" not in existing:
+                existing["trust"] = self._default_trust_model()
+                changed = True
+            if "world_anchor" not in existing:
+                existing["world_anchor"] = self._default_world_anchor()
+                changed = True
+            if changed:
+                self.memory.upsert_adaptation_profile(existing, source="profile_backfill")
             return existing
         profile = self._default_profile()
         self.memory.upsert_adaptation_profile(profile, source="default_init")
@@ -140,6 +156,27 @@ class OnboardingService:
         if stage in ("collaboration", "attachment"):
             return f"Welcome back to {place}. I kept things ready for us."
         return f"Welcome to {place}. Want to build it together?"
+
+    def get_first_contact(self):
+        profile = self.get_or_init_profile()
+        return deepcopy(profile.get("first_contact", self._default_first_contact()))
+
+    def update_first_contact(self, started=False, completed=False, interaction=False):
+        current = self.get_or_init_profile()
+        out = deepcopy(current)
+        fc = out.setdefault("first_contact", self._default_first_contact())
+        now = time.time()
+        if started and not fc.get("started_at"):
+            fc["started_at"] = now
+        if interaction:
+            fc["interactions"] = int(fc.get("interactions", 0)) + 1
+        if completed:
+            fc["active"] = False
+            fc["completed_at"] = now
+        out["updated_at"] = now
+        out["source"] = "first_contact_runtime"
+        self.memory.upsert_adaptation_profile(out, source="first_contact_runtime")
+        return out
 
     def apply_world_action(self, action, payload=None):
         current = self.get_or_init_profile()
@@ -570,8 +607,18 @@ class OnboardingService:
             "updated_at": time.time(),
             "policy": {},
             "neurodiversity_profile": {},
+            "first_contact": self._default_first_contact(),
             "trust": self._default_trust_model(),
             "world_anchor": self._default_world_anchor(),
+        }
+
+    def _default_first_contact(self):
+        return {
+            "active": True,
+            "started_at": None,
+            "completed_at": None,
+            "max_minutes": 5,
+            "interactions": 0,
         }
 
     def _default_world_anchor(self):

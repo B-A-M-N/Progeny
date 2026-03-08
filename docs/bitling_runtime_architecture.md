@@ -98,6 +98,7 @@ Brain -> Client:
 - `trust_stage_update`
 - `world_state`
 - `writing_pad_info`
+- `first_contact_completed`
 - `lesson_plan`
 - `speak`
 
