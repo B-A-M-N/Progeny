@@ -174,6 +174,9 @@ class OnboardingService:
         if regulation == "dysregulated":
             readiness = "switch_modality"
 
+        escalation = self.compute_escalation_profile(s, sig)
+        phase = self._infer_phase(engagement, cognitive_load, frustration, regulation, readiness, escalation, sig)
+
         return {
             "engagement": engagement,
             "cognitive_load": cognitive_load,
@@ -181,10 +184,17 @@ class OnboardingService:
             "regulation": regulation,
             "confidence": confidence,
             "challenge_readiness": readiness,
+            "escalation_score": escalation["score"],
+            "escalation_band": escalation["band"],
+            "escalation_signals": escalation["signals"],
+            "phase": phase,
         }
 
     def select_mode(self, live_state):
         st = live_state or {}
+        phase = str(st.get("phase", ""))
+        if phase in ("recover", "rest", "co_play", "explore", "engage", "practice"):
+            return phase
         if st.get("regulation") == "dysregulated" or st.get("challenge_readiness") == "switch_modality":
             return "recover"
         if st.get("frustration") in ("moderate", "acute"):
@@ -195,6 +205,51 @@ class OnboardingService:
 
     def render_adaptive_policy(self, live_state):
         mode = self.select_mode(live_state)
+        if mode == "rest":
+            return {
+                "mode": mode,
+                "prompt_style": "quiet_story",
+                "prompt_length": "very_short",
+                "sensory_density": "very_low",
+                "task_granularity": "none",
+                "modality": "passive_or_choice",
+            }
+        if mode == "co_play":
+            return {
+                "mode": mode,
+                "prompt_style": "co_play",
+                "prompt_length": "short",
+                "sensory_density": "low",
+                "task_granularity": "micro",
+                "modality": "play",
+            }
+        if mode == "explore":
+            return {
+                "mode": mode,
+                "prompt_style": "choice_or_story",
+                "prompt_length": "short",
+                "sensory_density": "moderate",
+                "task_granularity": "open",
+                "modality": "discovery",
+            }
+        if mode == "engage":
+            return {
+                "mode": mode,
+                "prompt_style": "interactive",
+                "prompt_length": "short",
+                "sensory_density": "moderate",
+                "task_granularity": "small_steps",
+                "modality": "interactive",
+            }
+        if mode == "practice":
+            return {
+                "mode": mode,
+                "prompt_style": "repetition_game",
+                "prompt_length": "short",
+                "sensory_density": "moderate",
+                "task_granularity": "repeatable",
+                "modality": "guided_practice",
+            }
         if mode == "recover":
             return {
                 "mode": mode,
@@ -230,6 +285,91 @@ class OnboardingService:
             "task_granularity": "progressive",
             "modality": "challenge",
         }
+
+    def compute_escalation_profile(self, state_summary, recent_signals=None):
+        s = state_summary or {}
+        sig = recent_signals or {}
+
+        # 12 early escalation channels (normalized 0..1)
+        channels = {
+            "response_latency_spike": self._clamp(sig.get("response_latency_spike", sig.get("latency_to_choice", 0.0))),
+            "rapid_topic_switching": self._clamp(sig.get("rapid_topic_switching", sig.get("topic_switch_rate", 0.0))),
+            "vocal_intensity": self._clamp(sig.get("vocal_intensity", 0.0)),
+            "repetitive_language_looping": self._clamp(sig.get("repetitive_language_looping", 0.0)),
+            "movement_acceleration": self._clamp(sig.get("movement_acceleration", 0.0)),
+            "micro_frustration": self._clamp(max(sig.get("micro_frustration", 0.0), sig.get("pressure_spike_frequency", 0.0))),
+            "interruptions": self._clamp(sig.get("interruptions", sig.get("interruption_rate", 0.0))),
+            "humor_deflection": self._clamp(sig.get("humor_deflection", 0.0)),
+            "silence_withdrawal": self._clamp(sig.get("silence_withdrawal", 0.0)),
+            "task_abandonment": self._clamp(max(sig.get("task_abandonment", 0.0), sig.get("partial_attempt_rate", 0.0))),
+            "facial_regulation_changes": self._clamp(sig.get("facial_regulation_changes", sig.get("facial_tension", 0.0))),
+            "breathing_pattern_shift": self._clamp(sig.get("breathing_pattern_shift", sig.get("breathing_shift", 0.0))),
+        }
+
+        # Use engagement drop as additional silence/withdrawal hint when no explicit signal.
+        engagement_raw = str(s.get("engagement_level", "none")).lower()
+        if engagement_raw in ("none", "low"):
+            channels["silence_withdrawal"] = max(channels["silence_withdrawal"], 0.25 if engagement_raw == "low" else 0.5)
+
+        weights = {
+            "response_latency_spike": 0.20,
+            "rapid_topic_switching": 0.10,
+            "vocal_intensity": 0.15,
+            "repetitive_language_looping": 0.10,
+            "movement_acceleration": 0.15,
+            "micro_frustration": 0.10,
+            "interruptions": 0.10,
+            "humor_deflection": 0.05,
+            "silence_withdrawal": 0.10,
+            "task_abandonment": 0.10,
+            "facial_regulation_changes": 0.10,
+            "breathing_pattern_shift": 0.10,
+        }
+        raw = 0.0
+        total = 0.0
+        for k, w in weights.items():
+            raw += channels[k] * w
+            total += w
+        score = self._clamp(raw / max(total, 1e-6))
+        if score < 0.30:
+            band = "low"
+        elif score <= 0.60:
+            band = "rising"
+        else:
+            band = "high"
+        return {"score": round(score, 4), "band": band, "signals": channels}
+
+    def _infer_phase(self, engagement, cognitive_load, frustration, regulation, readiness, escalation, signals):
+        band = escalation.get("band", "low")
+        score = float(escalation.get("score", 0.0))
+        if band == "high" or regulation == "dysregulated":
+            return "recover"
+        if band == "rising" and engagement in ("disengaged", "drifting") and cognitive_load in ("elevated", "high"):
+            return "rest"
+        if signals.get("humor_deflection", 0.0) > 0.45 or signals.get("rapid_topic_switching", 0.0) > 0.50:
+            return "co_play"
+        if engagement in ("disengaged",) and score < 0.30:
+            return "explore"
+        if engagement in ("steady", "high") and frustration == "none" and readiness == "can_increase":
+            return "advance"
+        if engagement in ("steady", "high") and frustration in ("none", "mild") and cognitive_load in ("workable",):
+            return "practice"
+        if engagement in ("steady", "drifting"):
+            return "engage"
+        if frustration in ("moderate", "acute"):
+            return "repair"
+        return "stabilize"
+
+    def _clamp(self, value):
+        try:
+            v = float(value)
+        except Exception:
+            v = 0.0
+        if v < 0.0:
+            return 0.0
+        if v > 1.0:
+            return 1.0
+        return v
 
     def _starter_plan(self):
         anchors = self.get_or_init_profile().get("interest_anchors", [])

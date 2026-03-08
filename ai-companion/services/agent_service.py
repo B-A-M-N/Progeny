@@ -109,6 +109,16 @@ class AgentService:
         if adaptive_mode == "recover":
             mode_rules.append("MODE=RECOVER. Stop teaching pressure. Prioritize regulation and low-demand co-play.")
             mode_rules.append("Use very short prompts. Offer choice-based or drawing-first interaction.")
+        elif adaptive_mode == "rest":
+            mode_rules.append("MODE=REST. Pause active teaching. Use calm, low-demand, restorative interaction only.")
+        elif adaptive_mode == "co_play":
+            mode_rules.append("MODE=CO_PLAY. Join the child's play and curiosity. No direct demands.")
+        elif adaptive_mode == "explore":
+            mode_rules.append("MODE=EXPLORE. Offer playful discovery choices. Help child lead topic selection.")
+        elif adaptive_mode == "engage":
+            mode_rules.append("MODE=ENGAGE. Keep attention warm with short, interactive co-activity.")
+        elif adaptive_mode == "practice":
+            mode_rules.append("MODE=PRACTICE. Reinforce mastery with repetition games and tiny wins.")
         elif adaptive_mode == "repair":
             mode_rules.append("MODE=REPAIR. Reduce demand and break tasks into tiny steps.")
             mode_rules.append("Use declarative language and guided success.")

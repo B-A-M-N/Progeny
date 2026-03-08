@@ -25,6 +25,7 @@ from utils.local_server import LocalAudioServer
 from utils.writing_server import app as writing_app
 import threading
 import traceback
+from collections import deque
 
 # Try to import EmbeddingService (requires fastembed)
 try:
@@ -101,6 +102,8 @@ class ProgenyEngine:
         self.current_onboarding_session = {}
         self.recent_adaptive_signals = {}
         self.active_media_sessions = {}
+        self.signal_alpha = 0.25
+        self.interest_history = deque(maxlen=12)
 
     def get_active_neuro_profile(self):
         adapted = self.onboarding.get_or_init_profile()
@@ -108,6 +111,50 @@ class ProgenyEngine:
         if neuro:
             return neuro
         return self.config.get('child', {}).get('neurodiversity_profile', {})
+
+    def _update_adaptive_signal(self, key, value):
+        # Accept normalized signals [0..1] and smooth with EMA.
+        k = str(key or "").strip()
+        if not k:
+            return
+        try:
+            v = float(value)
+        except Exception:
+            return
+        if v < 0.0:
+            v = 0.0
+        if v > 1.0:
+            v = 1.0
+        old = float(self.recent_adaptive_signals.get(k, 0.0))
+        self.recent_adaptive_signals[k] = (1.0 - self.signal_alpha) * old + self.signal_alpha * v
+
+    def _map_metric_to_signals(self, metric_key, metric_value):
+        k = str(metric_key or "").strip()
+        try:
+            v = float(metric_value)
+        except Exception:
+            v = 0.0
+        # Canonical 12-channel mappings
+        if k in ("response_latency_spike", "rapid_topic_switching", "vocal_intensity", "repetitive_language_looping",
+                 "movement_acceleration", "micro_frustration", "interruptions", "humor_deflection",
+                 "silence_withdrawal", "task_abandonment", "facial_regulation_changes", "breathing_pattern_shift"):
+            self._update_adaptive_signal(k, v)
+            return
+        # Aliases and derived mappings from existing metrics
+        if k in ("latency_to_choice", "latency_to_start", "response_latency"):
+            self._update_adaptive_signal("response_latency_spike", min(1.0, max(0.0, v / 8.0)))
+        elif k in ("topic_switch_rate",):
+            self._update_adaptive_signal("rapid_topic_switching", v)
+        elif k in ("pressure_spike_frequency",):
+            self._update_adaptive_signal("micro_frustration", v)
+        elif k in ("partial_attempt_rate", "task_abandonment"):
+            self._update_adaptive_signal("task_abandonment", v)
+        elif k in ("interruption_rate",):
+            self._update_adaptive_signal("interruptions", v)
+        elif k in ("facial_tension",):
+            self._update_adaptive_signal("facial_regulation_changes", v)
+        elif k in ("breathing_shift",):
+            self._update_adaptive_signal("breathing_pattern_shift", v)
 
     def load_config(self, path):
         project_root = os.path.dirname(os.path.abspath(__file__))
@@ -298,7 +345,13 @@ class ProgenyEngine:
                     self.current_onboarding_session.setdefault(session_id, {})
                     if metric_key:
                         self.current_onboarding_session[session_id][metric_key] = float(metric_value or 0.0)
-                        self.recent_adaptive_signals[metric_key] = float(metric_value or 0.0)
+                        self._map_metric_to_signals(metric_key, metric_value)
+                    metadata = event.get("metadata", {})
+                    if isinstance(metadata, dict):
+                        sig = metadata.get("signals", {})
+                        if isinstance(sig, dict):
+                            for sk, sv in sig.items():
+                                self._map_metric_to_signals(sk, sv)
                     updated = self.onboarding.apply_runtime_metrics(self.current_onboarding_session[session_id])
                     await websocket.send(json.dumps({
                         "type": "onboarding_runtime_update",
@@ -355,6 +408,8 @@ class ProgenyEngine:
                         success_score=success_score,
                         metadata=data.get("metadata", {})
                     )
+                    # Probe latency is a useful escalation indicator.
+                    self._map_metric_to_signals("response_latency", min(1.0, response_latency / 8.0))
                     await websocket.send(json.dumps({
                         "type": "media_probe_recorded",
                         "session_id": session_id,
@@ -412,6 +467,16 @@ class ProgenyEngine:
                             {"id": "order_check", "prompt": "What happened first?", "mode": "choice"},
                             {"id": "tiny_transfer", "prompt": "Want to try one tiny thing from that video?", "mode": "choice"}
                         ]
+                    }))
+                elif msg_type == "regulation_signal":
+                    # Direct signal channel for sensors/UI (0..1 normalized preferred).
+                    signals = data.get("signals", {})
+                    if isinstance(signals, dict):
+                        for sk, sv in signals.items():
+                            self._map_metric_to_signals(sk, sv)
+                    await websocket.send(json.dumps({
+                        "type": "regulation_signal_ack",
+                        "signals": self.recent_adaptive_signals
                     }))
         except websockets.exceptions.ConnectionClosed as e:
             print(f"[WebSocket] ConnectionClosed: {e}")
@@ -505,6 +570,14 @@ class ProgenyEngine:
 
                 self.state_svc.update_from_vision(vision_desc)
                 summary = self.state_svc.get_summary()
+                self.interest_history.append(str(summary.get("current_interest", "unknown")))
+                if len(self.interest_history) >= 4:
+                    switches = 0
+                    for i in range(1, len(self.interest_history)):
+                        if self.interest_history[i] != self.interest_history[i - 1]:
+                            switches += 1
+                    switch_rate = switches / max(1, len(self.interest_history) - 1)
+                    self._update_adaptive_signal("rapid_topic_switching", switch_rate)
                 live_state = self.onboarding.estimate_live_state(summary, self.recent_adaptive_signals)
                 adaptive_policy = self.onboarding.render_adaptive_policy(live_state)
                 summary_for_agent = dict(summary)

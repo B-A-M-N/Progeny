@@ -55,6 +55,11 @@ def _compute_stroke_metrics(strokes):
         "stroke_count": len(stroke_lengths),
         "stroke_fragmentation": round(stroke_fragmentation, 4),
         "engagement_duration": round(engagement_duration, 4),
+        "signals": {
+            "micro_frustration": round(min(1.0, pressure_spike_frequency), 4),
+            "task_abandonment": 1.0 if len(stroke_lengths) <= 1 else 0.0,
+            "movement_acceleration": round(min(1.0, pressure_var * 2.0), 4),
+        }
     }
 
 @app.route('/')
@@ -133,6 +138,9 @@ def submit_writing():
             metadata={"filename": filename, "metrics": metrics}
         )
         onboarding.apply_runtime_metrics(metrics)
+        if isinstance(metrics.get("signals"), dict):
+            for sk, sv in metrics["signals"].items():
+                memory.record_onboarding_metric("writing_signal", sk, sv, {"source": "writing_pad"})
         
         message = f"Nice job! Pressure was {status}."
     else:
@@ -145,6 +153,21 @@ def submit_writing():
         "metrics": metrics,
         "adaptation_profile": onboarding.get_or_init_profile()
     })
+
+
+@app.route('/api/regulation/signal', methods=['POST'])
+def regulation_signal():
+    data = request.json or {}
+    session_id = str(data.get("session_id", "external_signal"))
+    signals = data.get("signals", {})
+    if isinstance(signals, dict):
+        for sk, sv in signals.items():
+            try:
+                val = float(sv)
+            except Exception:
+                continue
+            memory.record_onboarding_metric(session_id, sk, val, {"source": "external_signal"})
+    return jsonify({"success": True, "recorded": list(signals.keys()) if isinstance(signals, dict) else []})
 
 
 @app.route('/api/onboarding/baseline', methods=['POST'])
