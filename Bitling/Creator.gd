@@ -476,7 +476,7 @@ func finalize_and_start():
 		socket.send_text(JSON.stringify({"type": "finalize_tutor"}))
 	else:
 		print("[Creation] Finalize skipped: brain not connected.")
-	get_tree().change_scene_to_file("res://Main.tscn")
+	get_tree().change_scene_to_file("res://Onboarding.tscn")
 
 func stop_generation(msg):
 	if demo_label: demo_label.text = msg

@@ -1,0 +1,297 @@
+[gd_scene load_steps=2 format=3 uid="uid://onboarding_scene"]
+
+[ext_resource type="Script" path="res://Onboarding.gd" id="1_onboard"]
+
+[node name="Onboarding" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_onboard")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.07, 0.1, 0.12, 1)
+
+[node name="Root" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 16
+
+[node name="TopBar" type="HBoxContainer" parent="Root"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Root/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 28
+text = "Bitling First Meeting"
+
+[node name="StatusLabel" type="Label" parent="Root/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 2
+text = "Connecting..."
+
+[node name="TabContainer" type="TabContainer" parent="Root"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Parent" type="Control" parent="Root/TabContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ParentVBox" type="VBoxContainer" parent="Root/TabContainer/Parent"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="Intro" type="Label" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Parent Baseline (Optional): help Bitling meet your child where they are."
+
+[node name="Grid" type="GridContainer" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+
+[node name="AgeLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Age"
+
+[node name="AgeSpin" type="SpinBox" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+min_value = 2.0
+max_value = 18.0
+value = 6.0
+
+[node name="CommLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Communication"
+
+[node name="CommMode" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 4
+selected = 0
+popup/item_0/text = "verbal"
+popup/item_1/text = "partial verbal"
+popup/item_2/text = "gestures"
+popup/item_3/text = "aac/typing"
+
+[node name="SoundLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Sound Sensitivity"
+
+[node name="SoundSens" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="VisualLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Visual Sensitivity"
+
+[node name="VisualSens" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="LatencyLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Processing Latency"
+
+[node name="LatencyPref" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="LiteralLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Literalness"
+
+[node name="LiteralnessPref" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 2
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="DemandLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Demand Avoidance"
+
+[node name="DemandPref" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="RecoveryLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+text = "Recovery Speed"
+
+[node name="RecoveryPref" type="OptionButton" parent="Root/TabContainer/Parent/ParentVBox/Grid"]
+layout_mode = 2
+item_count = 3
+selected = 1
+popup/item_0/text = "low"
+popup/item_1/text = "medium"
+popup/item_2/text = "high"
+
+[node name="InterestsField" type="LineEdit" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+placeholder_text = "Interest anchors (comma-separated): dinosaurs, space, trains..."
+
+[node name="Traits" type="HBoxContainer" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="AutismLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Traits"]
+layout_mode = 2
+text = "Autism Traits"
+
+[node name="AutismSlider" type="HSlider" parent="Root/TabContainer/Parent/ParentVBox/Traits"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 0.5
+
+[node name="ADHDLabel" type="Label" parent="Root/TabContainer/Parent/ParentVBox/Traits"]
+layout_mode = 2
+text = "ADHD Traits"
+
+[node name="ADHDSlider" type="HSlider" parent="Root/TabContainer/Parent/ParentVBox/Traits"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.05
+value = 0.5
+
+[node name="NotesField" type="TextEdit" parent="Root/TabContainer/Parent/ParentVBox"]
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+placeholder_text = "Notes: frustration cues, calming supports, school struggles..."
+
+[node name="ParentButtons" type="HBoxContainer" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SaveParentButton" type="Button" parent="Root/TabContainer/Parent/ParentVBox/ParentButtons"]
+layout_mode = 2
+text = "Save Parent Baseline"
+
+[node name="BeginChildButton" type="Button" parent="Root/TabContainer/Parent/ParentVBox/ParentButtons"]
+layout_mode = 2
+text = "Begin Child Session"
+
+[node name="GoMainButton" type="Button" parent="Root/TabContainer/Parent/ParentVBox/ParentButtons"]
+layout_mode = 2
+text = "Skip To Companion"
+
+[node name="Summary" type="RichTextLabel" parent="Root/TabContainer/Parent/ParentVBox"]
+custom_minimum_size = Vector2(0, 160)
+layout_mode = 2
+bbcode_enabled = true
+fit_content = false
+text = "Summary will appear here after finishing child session."
+
+[node name="Child" type="Control" parent="Root/TabContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ChildVBox" type="VBoxContainer" parent="Root/TabContainer/Child"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 14
+
+[node name="Prompt" type="Label" parent="Root/TabContainer/Child/ChildVBox"]
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+autowrap_mode = 3
+text = "Press Begin Child Session to load the world-building prompts."
+
+[node name="OptionRow" type="HBoxContainer" parent="Root/TabContainer/Child/ChildVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OptionA" type="Button" parent="Root/TabContainer/Child/ChildVBox/OptionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Option A"
+
+[node name="OptionB" type="Button" parent="Root/TabContainer/Child/ChildVBox/OptionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Option B"
+
+[node name="OptionC" type="Button" parent="Root/TabContainer/Child/ChildVBox/OptionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Option C"
+
+[node name="Hint" type="Label" parent="Root/TabContainer/Child/ChildVBox"]
+layout_mode = 2
+text = "Use low-pressure language. This should feel like co-play, not a test."
+
+[node name="FlowButtons" type="HBoxContainer" parent="Root/TabContainer/Child/ChildVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NextButton" type="Button" parent="Root/TabContainer/Child/ChildVBox/FlowButtons"]
+layout_mode = 2
+text = "Next Prompt"
+
+[node name="SkipButton" type="Button" parent="Root/TabContainer/Child/ChildVBox/FlowButtons"]
+layout_mode = 2
+text = "Skip Prompt"
+
+[node name="FinishButton" type="Button" parent="Root/TabContainer/Child/ChildVBox/FlowButtons"]
+layout_mode = 2
+text = "Finish & Build Plan"
