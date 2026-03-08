@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/media_probe_event.schema.json",
+  "title": "media_probe_event",
+  "type": "object",
+  "required": ["type", "session_id", "probe_type"],
+  "properties": {
+    "type": { "const": "media_probe_event" },
+    "session_id": { "type": "string", "minLength": 1 },
+    "probe_type": { "type": "string", "minLength": 1 },
+    "response_mode": { "type": "string" },
+    "response_latency": { "type": ["number", "integer"] },
+    "success_score": { "type": ["number", "integer"] },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": true
+}

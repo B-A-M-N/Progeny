@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/set_parent_baseline.schema.json",
+  "title": "set_parent_baseline",
+  "type": "object",
+  "required": ["type", "baseline"],
+  "properties": {
+    "type": { "const": "set_parent_baseline" },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "age": { "type": ["number", "integer"] },
+        "interest_anchors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "communication_style": { "type": "object" },
+        "sensory_profile": { "type": "object" },
+        "regulation_signals": { "type": "object" },
+        "learning_notes": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

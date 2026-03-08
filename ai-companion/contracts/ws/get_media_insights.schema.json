@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/get_media_insights.schema.json",
+  "title": "get_media_insights",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "get_media_insights" },
+    "topic": { "type": "string" }
+  },
+  "additionalProperties": true
+}

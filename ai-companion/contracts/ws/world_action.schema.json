@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/world_action.schema.json",
+  "title": "world_action",
+  "type": "object",
+  "required": ["type", "action"],
+  "properties": {
+    "type": { "const": "world_action" },
+    "action": {
+      "type": "string",
+      "enum": [
+        "set_location",
+        "add_companion",
+        "collect_item",
+        "unlock_area",
+        "name_entity",
+        "add_event",
+        "add_mission",
+        "complete_mission"
+      ]
+    },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": true
+}

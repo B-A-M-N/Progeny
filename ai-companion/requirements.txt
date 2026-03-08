@@ -15,6 +15,7 @@ ollama
 fastembed
 pydantic
 json-repair
+jsonschema
 
 # Audio / speech / memory
 kokoro-onnx

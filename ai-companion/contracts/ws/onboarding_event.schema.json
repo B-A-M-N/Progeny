@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/onboarding_event.schema.json",
+  "title": "onboarding_event",
+  "type": "object",
+  "required": ["type", "event"],
+  "properties": {
+    "type": { "const": "onboarding_event" },
+    "session_id": { "type": "string" },
+    "event": {
+      "type": "object",
+      "required": ["metric_key", "metric_value"],
+      "properties": {
+        "metric_key": { "type": "string", "minLength": 1 },
+        "metric_value": { "type": ["number", "integer"] },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

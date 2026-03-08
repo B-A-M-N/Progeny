@@ -23,6 +23,7 @@ from services.resource_service import ResourceService
 from services.onboarding_service import OnboardingService
 from utils.local_server import LocalAudioServer
 from utils.writing_server import app as writing_app
+from utils.ws_contracts import WSContracts
 import threading
 import traceback
 from collections import deque
@@ -232,6 +233,14 @@ class ProgenyEngine:
             
             async for message in websocket:
                 data = json.loads(message)
+                is_valid, err = WSContracts.validate_message(data)
+                if not is_valid:
+                    await websocket.send(json.dumps({
+                        "type": "error",
+                        "message": f"Invalid message contract: {err}"
+                    }))
+                    print(f"[WebSocket] Contract validation failed: {err} | payload={str(data)[:280]}")
+                    continue
                 msg_type = data.get("type")
 
                 if msg_type == "construct_tutor_local":

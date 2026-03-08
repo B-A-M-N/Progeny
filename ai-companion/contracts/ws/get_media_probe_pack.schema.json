@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/get_media_probe_pack.schema.json",
+  "title": "get_media_probe_pack",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": { "const": "get_media_probe_pack" }
+  },
+  "additionalProperties": true
+}

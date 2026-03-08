@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/regulation_signal.schema.json",
+  "title": "regulation_signal",
+  "type": "object",
+  "required": ["type", "signals"],
+  "properties": {
+    "type": { "const": "regulation_signal" },
+    "signals": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["number", "integer"]
+      }
+    }
+  },
+  "additionalProperties": true
+}

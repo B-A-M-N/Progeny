@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/end_media_session.schema.json",
+  "title": "end_media_session",
+  "type": "object",
+  "required": ["type", "session_id"],
+  "properties": {
+    "type": { "const": "end_media_session" },
+    "session_id": { "type": "string", "minLength": 1 },
+    "watched_seconds": { "type": ["number", "integer"] },
+    "completed": { "type": "boolean" },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": true
+}

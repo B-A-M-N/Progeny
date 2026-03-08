@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://progeny.local/contracts/ws/start_media_session.schema.json",
+  "title": "start_media_session",
+  "type": "object",
+  "required": ["type", "topic"],
+  "properties": {
+    "type": { "const": "start_media_session" },
+    "session_id": { "type": "string" },
+    "topic": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "url": { "type": "string" },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": true
+}

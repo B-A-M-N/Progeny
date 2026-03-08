@@ -99,6 +99,11 @@ Brain -> Client:
 - `lesson_plan`
 - `speak`
 
+Schema files (source of truth for inbound message validation):
+
+- `ai-companion/contracts/ws/*.schema.json`
+- Runtime validator: `ai-companion/utils/ws_contracts.py`
+
 ## Canonical Event Shapes
 
 ### `onboarding_event`
