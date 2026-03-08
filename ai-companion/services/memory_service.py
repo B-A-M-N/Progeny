@@ -1,248 +1,419 @@
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import os
 import json
 import time
 import numpy as np
+from pgvector.psycopg2 import register_vector
 
 class MemoryService:
-    def __init__(self, db_path=".gemini_security/second_brain.db", embedding_service=None):
-        # Resolve path relative to project root
-        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.db_path = os.path.join(self.project_root, db_path)
+    def __init__(self, db_config=None, embedding_service=None):
         self.embedding = embedding_service
-        
-        # Ensure directory exists
-        db_dir = os.path.dirname(self.db_path)
-        if not os.path.exists(db_dir):
-            os.makedirs(db_dir)
-            
+        self.db_config = db_config or {
+            "dbname": "progeny_brain",
+            "user": "bitling",
+            "password": "tutor_brain",
+            "host": "localhost"
+        }
         self.init_db()
 
+    def get_conn(self):
+        conn = psycopg2.connect(**self.db_config)
+        register_vector(conn)
+        return conn
+
+    def health_check(self):
+        """Returns (ok: bool, detail: str) for Open Brain database connectivity."""
+        try:
+            conn = self.get_conn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return True, "connected"
+        except Exception as e:
+            return False, f"{type(e).__name__}: {e}"
+
     def init_db(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = self.get_conn()
         cursor = conn.cursor()
         
-        # Events table: stores everything that happens (loop history)
+        # 1. Facts & Semantic Memory (Using pgvector)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS knowledge (
+                id SERIAL PRIMARY KEY,
+                key TEXT UNIQUE,
+                content TEXT,
+                embedding vector(384), -- Dimension for fastembed default
+                metadata JSONB,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # 2. Events Log
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 timestamp REAL,
                 event_type TEXT,
                 vision_desc TEXT,
-                state_snapshot TEXT,
+                state_snapshot JSONB,
                 agent_response TEXT,
-                metadata TEXT
-            )
-        ''')
-        
-        # Knowledge table: stores long-term facts/interests about the child
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS knowledge (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                key TEXT UNIQUE,
-                value TEXT,
-                confidence REAL,
-                last_updated REAL
-            )
-        ''')
-        
-        # Embeddings for knowledge
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS knowledge_embeddings (
-                key TEXT PRIMARY KEY,
-                embedding BLOB,
-                FOREIGN KEY(key) REFERENCES knowledge(key) ON DELETE CASCADE
-            )
-        ''')
-        
-        # Lessons table: stores generated lesson plans/reports
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS lessons (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                subject TEXT UNIQUE,
-                report TEXT,
-                sources TEXT, -- JSON list of URLs
-                created_at REAL
+                metadata JSONB
             )
         ''')
 
-        # Struggles table: tracks difficulties the child is having
+        # 3. Lessons Archive
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS lessons (
+                id SERIAL PRIMARY KEY,
+                subject TEXT UNIQUE,
+                report TEXT,
+                sources JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # 4. Struggles (Scaffolding Support)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS struggles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 timestamp REAL,
                 subject TEXT,
                 description TEXT,
-                severity TEXT, -- 'low', 'medium', 'high'
-                resolved BOOLEAN DEFAULT 0
+                severity TEXT,
+                resolved BOOLEAN DEFAULT FALSE
+            )
+        ''')
+
+        # 5. Tutor Profile (RPG Evolution)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tutor_profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                name TEXT DEFAULT 'Bitling',
+                appearance TEXT DEFAULT 'default',
+                attitude TEXT DEFAULT 'helpful',
+                level INTEGER DEFAULT 1,
+                xp INTEGER DEFAULT 0
+            )
+        ''')
+
+        # 6. XP Events (Child-Centered Progress Ledger)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS xp_events (
+                id SERIAL PRIMARY KEY,
+                event_type TEXT, -- 'MASTERY', 'EFFORT', 'SELF_ADVOCACY', 'STRUGGLE_RESOLVED'
+                amount INTEGER,
+                skill_id INTEGER,
+                evidence TEXT,
+                timestamp REAL
+            )
+        ''')
+
+        # 7. Skills & Progress (Learning Stage Tracking)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS skills (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE,
+                domain TEXT, -- 'academic', 'social', 'regulation'
+                criteria TEXT
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS skill_progress (
+                skill_id INTEGER REFERENCES skills(id),
+                attempts INTEGER DEFAULT 0,
+                successes INTEGER DEFAULT 0,
+                mastered_at TIMESTAMP
+            )
+        ''')
+
+        # 8. Knowledge Graph (Interest-to-Concept Relationships)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nodes (
+                id SERIAL PRIMARY KEY,
+                key TEXT UNIQUE,
+                label TEXT, -- 'interest', 'concept', 'skill'
+                metadata JSONB
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS edges (
+                id SERIAL PRIMARY KEY,
+                source_id INTEGER REFERENCES nodes(id),
+                target_id INTEGER REFERENCES nodes(id),
+                rel_type TEXT, -- 'causes', 'related_to', 'part_of', 'bridged_by'
+                metadata JSONB,
+                UNIQUE(source_id, target_id, rel_type)
             )
         ''')
         
-        conn.commit()
-        conn.close()
-
-    def record_event(self, event_type, vision_desc, state_snapshot, agent_response, metadata=None):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         cursor.execute('''
-            INSERT INTO events (timestamp, event_type, vision_desc, state_snapshot, agent_response, metadata)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            time.time(),
-            event_type,
-            vision_desc,
-            json.dumps(state_snapshot),
-            agent_response,
-            json.dumps(metadata) if metadata else None
-        ))
+            INSERT INTO tutor_profile (id, name, appearance, attitude, level, xp)
+            VALUES (1, 'Bitling', 'default', 'helpful', 1, 0)
+            ON CONFLICT (id) DO NOTHING;
+        ''')
         
         conn.commit()
+        cursor.close()
         conn.close()
 
-    def update_knowledge(self, key, value, confidence=1.0):
-        conn = sqlite3.connect(self.db_path)
+    def update_knowledge(self, key, content, confidence=1.0):
+        embedding = self.embedding.embed(content) if self.embedding else None
+        conn = self.get_conn()
         cursor = conn.cursor()
-        
         cursor.execute('''
-            INSERT INTO knowledge (key, value, confidence, last_updated)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                confidence = excluded.confidence,
-                last_updated = excluded.last_updated
-        ''', (key, value, confidence, time.time()))
-        
+            INSERT INTO knowledge (key, content, embedding, metadata)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET 
+                content = EXCLUDED.content,
+                embedding = EXCLUDED.embedding,
+                metadata = EXCLUDED.metadata,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (key, content, embedding, json.dumps({"confidence": confidence})))
         conn.commit()
+        cursor.close()
         conn.close()
 
-        # Update embedding if service is available
-        if self.embedding:
-            try:
-                emb = self.embedding.embed([value])[0]
-                blob = emb.tobytes()
-                conn = sqlite3.connect(self.db_path)
-                c = conn.cursor()
-                c.execute('INSERT OR REPLACE INTO knowledge_embeddings (key, embedding) VALUES (?, ?)', (key, blob))
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                print(f"[Memory] Embedding failed for {key}: {e}")
-
-    def get_knowledge(self, key):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT value FROM knowledge WHERE key = ?', (key,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result else None
-        
     def search_knowledge(self, query, top_k=3):
-        if not self.embedding:
-            print("[Memory] No embedding service available for semantic search")
-            return []
+        if not self.embedding: return []
+        query_vec = self.embedding.embed(query)
         
-        try:
-            # Embed query
-            query_emb = self.embedding.embed([query])[0]
-            
-            # Fetch all embeddings
-            conn = sqlite3.connect(self.db_path)
-            c = conn.cursor()
-            c.execute('SELECT key, embedding FROM knowledge_embeddings')
-            rows = c.fetchall()
-            conn.close()
-            
-            if not rows:
-                return []
-            
-            scores = []
-            for key, blob in rows:
-                doc_emb = np.frombuffer(blob, dtype=np.float32)
-                # Cosine similarity
-                norm_product = np.linalg.norm(query_emb) * np.linalg.norm(doc_emb)
-                if norm_product == 0:
-                    score = 0
-                else:
-                    score = np.dot(query_emb, doc_emb) / norm_product
-                scores.append((score, key))
-                
-            scores.sort(key=lambda x: x[0], reverse=True)
-            
-            results = []
-            for score, key in scores[:top_k]:
-                val = self.get_knowledge(key)
-                results.append({"key": key, "value": val, "score": float(score)})
-                
-            return results
-        except Exception as e:
-            print(f"[Memory] Semantic search failed: {e}")
-            return []
-
-    def get_recent_events(self, limit=5):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM events ORDER BY timestamp DESC LIMIT ?', (limit,))
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Use pgvector's cosine distance operator (<=>)
+        cursor.execute('''
+            SELECT key, content, metadata
+            FROM knowledge
+            ORDER BY embedding <=> %s
+            LIMIT %s
+        ''', (query_vec, top_k))
         results = cursor.fetchall()
+        cursor.close()
         conn.close()
         return results
 
-    def save_lesson(self, subject, report, sources=None):
-        conn = sqlite3.connect(self.db_path)
+    def get_tutor_profile(self):
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM tutor_profile WHERE id = 1')
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return res
+
+    def log_xp_event(self, event_type, amount, skill_id=None, evidence=None):
+        """
+        Logs a child-centered XP event and updates the Bond Level.
+        Returns: (leveled_up: bool, new_level: int)
+        """
+        profile = self.get_tutor_profile()
+        new_xp = profile['xp'] + amount
+        # Bond Level formula: (XP // 100) + 1
+        new_level = (new_xp // 100) + 1
+        
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        
+        # 1. Log the event
+        cursor.execute('''
+            INSERT INTO xp_events (event_type, amount, skill_id, evidence, timestamp)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (event_type, amount, skill_id, evidence, time.time()))
+        
+        # 2. Update Profile
+        cursor.execute('UPDATE tutor_profile SET xp = %s, level = %s WHERE id = 1', (new_xp, new_level))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return new_level > profile['level'], new_level
+
+    def resolve_struggle(self, struggle_id):
+        """
+        Marks a struggle as resolved and awards a major XP milestone.
+        """
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE struggles SET resolved = TRUE WHERE id = %s', (struggle_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Award Major Milestone XP
+        return self.log_xp_event('STRUGGLE_RESOLVED', 50, evidence=f"Resolved struggle ID {struggle_id}")
+
+    def get_learning_stage(self):
+        """
+        Calculates Readiness Stage (1-3) based on mastered skills.
+        Stage 1 (Foundational): < 5 mastered
+        Stage 2 (Emerging): 5-15 mastered
+        Stage 3 (Fluent): > 15 mastered
+        """
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM skill_progress WHERE mastered_at IS NOT NULL')
+        mastered_count = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        
+        if mastered_count < 5: return 1
+        if mastered_count <= 15: return 2
+        return 3
+
+    def record_event(self, event_type, vision_desc, state_snapshot, agent_response, metadata=None):
+        conn = self.get_conn()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO lessons (subject, report, sources, created_at)
-            VALUES (?, ?, ?, ?)
-        ''', (subject, report, json.dumps(sources) if sources else None, time.time()))
+            INSERT INTO events (timestamp, event_type, vision_desc, state_snapshot, agent_response, metadata)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (time.time(), event_type, vision_desc, json.dumps(state_snapshot), agent_response, json.dumps(metadata)))
         conn.commit()
+        cursor.close()
         conn.close()
 
     def get_lesson(self, subject):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT report, sources FROM lessons WHERE subject = ?', (subject,))
-        result = cursor.fetchone()
+        """Retrieves a previously planned lesson from the database."""
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT report FROM lessons WHERE subject = %s", (subject,))
+        row = cursor.fetchone()
+        cursor.close()
         conn.close()
-        if result:
-            return {"report": result[0], "sources": json.loads(result[1]) if result[1] else []}
-        return None
+        return row['report'] if row else None
 
-    def record_struggle(self, subject, description, severity='medium'):
-        conn = sqlite3.connect(self.db_path)
+    def save_lesson(self, subject, report, sources=None):
+        """Saves a new lesson report."""
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO lessons (subject, report, sources) 
+            VALUES (%s, %s, %s)
+            ON CONFLICT (subject) DO UPDATE SET 
+                report = EXCLUDED.report,
+                sources = EXCLUDED.sources,
+                created_at = CURRENT_TIMESTAMP
+        ''', (subject, report, json.dumps(sources) if sources else "[]"))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def record_struggle(self, subject, description, severity="medium"):
+        """Records a new learning or developmental struggle."""
+        conn = self.get_conn()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO struggles (timestamp, subject, description, severity)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         ''', (time.time(), subject, description, severity))
         conn.commit()
+        cursor.close()
         conn.close()
 
-    def get_unresolved_struggles(self, limit=5):
-        conn = sqlite3.connect(self.db_path)
+    def get_unresolved_struggles(self):
+        """Returns all struggles that haven't been resolved yet."""
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM struggles WHERE resolved = FALSE ORDER BY timestamp DESC')
+        res = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return res
+
+    # --- Knowledge Graph Methods ---
+
+    def add_node(self, key, label, metadata=None):
+        """Adds or updates a node in the knowledge graph."""
+        conn = self.get_conn()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM struggles WHERE resolved = 0 ORDER BY timestamp DESC LIMIT ?', (limit,))
+        cursor.execute('''
+            INSERT INTO nodes (key, label, metadata)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET
+                label = EXCLUDED.label,
+                metadata = EXCLUDED.metadata
+            RETURNING id
+        ''', (key, label, json.dumps(metadata) if metadata else "{}"))
+        node_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return node_id
+
+    def add_edge(self, source_key, target_key, rel_type, metadata=None):
+        """Creates a relationship between two nodes."""
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        
+        # Get Node IDs (Ensure they exist)
+        cursor.execute('SELECT id FROM nodes WHERE key = %s', (source_key,))
+        src_row = cursor.fetchone()
+        cursor.execute('SELECT id FROM nodes WHERE key = %s', (target_key,))
+        tgt_row = cursor.fetchone()
+
+        if not src_row or not tgt_row:
+            cursor.close()
+            conn.close()
+            return None # Or handle error
+
+        cursor.execute('''
+            INSERT INTO edges (source_id, target_id, rel_type, metadata)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (source_id, target_id, rel_type) DO UPDATE SET
+                metadata = EXCLUDED.metadata
+        ''', (src_row[0], tgt_row[0], rel_type, json.dumps(metadata) if metadata else "{}"))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def get_related_nodes(self, key):
+        """Retrieves nodes connected to the given node key."""
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT n2.key, n2.label, e.rel_type, e.metadata
+            FROM nodes n1
+            JOIN edges e ON n1.id = e.source_id
+            JOIN nodes n2 ON e.target_id = n2.id
+            WHERE n1.key = %s
+            UNION
+            SELECT n1.key, n1.label, e.rel_type, e.metadata
+            FROM nodes n2
+            JOIN edges e ON n2.id = e.target_id
+            JOIN nodes n1 ON e.source_id = n1.id
+            WHERE n2.key = %s
+        ''', (key, key))
         results = cursor.fetchall()
+        cursor.close()
         conn.close()
         return results
 
-    def resolve_struggle(self, struggle_id):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('UPDATE struggles SET resolved = 1 WHERE id = ?', (struggle_id,))
-        conn.commit()
-        conn.close()
-
-if __name__ == "__main__":
-    # Dummy embedding service for testing if fastembed not installed
-    class DummyEmbedding:
-        def embed(self, texts):
-            import numpy as np
-            return [np.random.rand(384).astype(np.float32) for _ in texts]
-            
-    memory = MemoryService(embedding_service=DummyEmbedding())
-    memory.record_event("test", "A child is playing with a train", {"interest": "trains"}, "Hello, that's a cool train!")
-    memory.update_knowledge("favorite_train", "Big Boy Steam Engine")
-    
-    print("Recent Events:", memory.get_recent_events(1))
-    print("Favorite Train:", memory.get_knowledge("favorite_train"))
-    print("Semantic Search 'steam engine':", memory.search_knowledge("steam engine"))
+    def hybrid_retrieval(self, query, top_k=3):
+        """
+        Combines vector similarity with graph traversal for deep context.
+        """
+        # 1. Vector Search
+        vector_results = self.search_knowledge(query, top_k=top_k)
+        
+        # 2. Graph Expansion
+        graph_context = []
+        seen_keys = set()
+        
+        for res in vector_results:
+            key = res['key']
+            seen_keys.add(key)
+            related = self.get_related_nodes(key)
+            for r in related:
+                if r['key'] not in seen_keys:
+                    graph_context.append(r)
+                    seen_keys.add(r['key'])
+        
+        return {
+            "semantic_matches": vector_results,
+            "related_concepts": graph_context
+        }

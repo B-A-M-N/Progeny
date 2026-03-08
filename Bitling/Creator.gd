@@ -173,6 +173,13 @@ func handle_backend_message(json_str: String):
 			"init":
 				prefer_local = data.get("generation", {}).get("prefer_local", false)
 				print("[Creation] Init received. Prefer Local: ", prefer_local)
+				var ob = data.get("open_brain", {})
+				var ob_ok = bool(ob.get("connected", false))
+				var ob_detail = str(ob.get("detail", "unknown"))
+				if demo_label and not is_generating:
+					demo_label.text = "Open Brain: " + ("CONNECTED" if ob_ok else "DISCONNECTED")
+					if not ob_ok:
+						demo_label.text += " (" + ob_detail + ")"
 			"tutor_constructed":
 				is_generating = false
 				if data.get("fallback", false) and demo_label:
