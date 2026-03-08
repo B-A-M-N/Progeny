@@ -357,10 +357,12 @@ class ProgenyEngine:
                         attitude=data.get("attitude")
                     )
                 elif msg_type == "get_onboarding_script":
+                    profile = self.onboarding.get_or_init_profile()
                     await websocket.send(json.dumps({
                         "type": "onboarding_script",
                         "items": self.onboarding.get_session_script(),
-                        "profile": self.onboarding.get_or_init_profile()
+                        "profile": profile,
+                        "warmup": profile.get("warmup", self.onboarding.get_warmup_status())
                     }))
                 elif msg_type == "get_world_state":
                     profile = self.onboarding.get_or_init_profile()
@@ -395,7 +397,8 @@ class ProgenyEngine:
                     await websocket.send(json.dumps({
                         "type": "onboarding_profile_updated",
                         "profile": profile,
-                        "neurodiversity": profile.get("neurodiversity_profile", {})
+                        "neurodiversity": profile.get("neurodiversity_profile", {}),
+                        "warmup": profile.get("warmup", {})
                     }))
                 elif msg_type == "onboarding_event":
                     session_id = str(data.get("session_id", "default"))
@@ -428,8 +431,9 @@ class ProgenyEngine:
                 elif msg_type == "finish_onboarding":
                     session_id = str(data.get("session_id", "default"))
                     metrics = self.current_onboarding_session.get(session_id, {})
-                    summary = self.onboarding.summarize_for_parent(metrics)
-                    profile = self.onboarding.get_or_init_profile()
+                    finalized = self.onboarding.finalize_onboarding_session(session_id, metrics)
+                    summary = finalized.get("summary", {})
+                    profile = finalized.get("profile", self.onboarding.get_or_init_profile())
                     await websocket.send(json.dumps({
                         "type": "onboarding_summary",
                         "session_id": session_id,
@@ -437,6 +441,7 @@ class ProgenyEngine:
                         "profile": profile,
                         "world_anchor": profile.get("world_anchor", {}),
                         "trust_model": profile.get("trust", {}),
+                        "warmup": profile.get("warmup", {}),
                     }))
                 elif msg_type == "start_media_session":
                     session_id = str(data.get("session_id", f"media_{int(time.time())}"))

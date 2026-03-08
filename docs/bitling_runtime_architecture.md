@@ -64,6 +64,11 @@ Internal modes:
 
 - `explore`, `engage`, `advance`, `practice`, `stabilize`, `repair`, `recover`, `rest`, `co_play`
 
+Onboarding warm-up option:
+
+- Optional same-child warm-up runs: 3 separate short passes.
+- Each run uses the same core script with higher engagement intensity (`low -> medium -> high`).
+
 ## WebSocket Contract (current + required)
 
 Client -> Brain:

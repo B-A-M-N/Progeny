@@ -11,14 +11,38 @@ class OnboardingService:
         profile = self.get_or_init_profile()
         anchors = profile.get("interest_anchors", []) or []
         primary_interest = str(anchors[0]).strip() if anchors else "space creatures"
+        warm = profile.get("warmup", self._default_warmup())
+        run_idx = int(warm.get("current_run", 1) or 1)
+        total_runs = int(warm.get("total_runs", 3) or 3)
+        intensity = self._warmup_intensity(run_idx, total_runs)
+        intro = "Hello? Is someone there? I think I found a new friend."
+        if intensity == "medium":
+            intro = "Hey Earth friend, I am back. Want to help me test a fun mission?"
+        elif intensity == "high":
+            intro = "Portal signal locked. Ready to open our biggest mission yet?"
+        companion_prompt = "I am new here. Which helper should join us first?"
+        if intensity == "medium":
+            companion_prompt = "Pick our helper for this run. We can make it faster this time."
+        elif intensity == "high":
+            companion_prompt = "Final warm-up run. Choose our best helper for the big reveal."
+        speed_prompt = "Want to help me test my speed scanner? Show FAST and then SLOW drawing."
+        if intensity == "medium":
+            speed_prompt = "Speed challenge level 2: super-fast then super-smooth."
+        elif intensity == "high":
+            speed_prompt = "Final speed challenge: turbo-fast, then perfect slow control."
+        return_hook = "Tomorrow I can open a tiny portal. What should appear first?"
+        if intensity == "medium":
+            return_hook = "Next run unlocks a brighter portal. Should it reveal dragons or rockets?"
+        elif intensity == "high":
+            return_hook = "You completed warm-up. Next we open the full world together."
         return [
-            {"id": "observer_hook", "prompt": "Hello? Is someone there? I think I found a new friend.", "type": "mystery_intro", "skip_allowed": True},
-            {"id": "companion_choice", "prompt": "I am new here. Which helper should join us first?", "type": "choice", "skip_allowed": True},
+            {"id": "observer_hook", "prompt": intro, "type": "mystery_intro", "skip_allowed": True},
+            {"id": "companion_choice", "prompt": companion_prompt, "type": "choice", "skip_allowed": True},
             {"id": "interest_bridge", "prompt": f"I heard Earth has amazing {primary_interest}. Can you show me your favorite one?", "type": "drawing", "skip_allowed": True},
             {"id": "show_faces", "prompt": "I am still learning Earth feelings. Can you show me a happy and silly face?", "type": "camera_play", "skip_allowed": True},
-            {"id": "fast_slow", "prompt": "Want to help me test my speed scanner? Show FAST and then SLOW drawing.", "type": "drawing_pace", "skip_allowed": True},
+            {"id": "fast_slow", "prompt": speed_prompt, "type": "drawing_pace", "skip_allowed": True},
             {"id": "interest_fork", "prompt": "Should our world open dinosaurs, rockets, or ocean first?", "type": "choice", "skip_allowed": True},
-            {"id": "return_hook", "prompt": "Tomorrow I can open a tiny portal. What should appear first?", "type": "future_hook", "skip_allowed": True},
+            {"id": "return_hook", "prompt": return_hook, "type": "future_hook", "skip_allowed": True},
         ]
 
     def get_or_init_profile(self):
@@ -34,6 +58,9 @@ class OnboardingService:
                 changed = True
             if "world_anchor" not in existing:
                 existing["world_anchor"] = self._default_world_anchor()
+                changed = True
+            if "warmup" not in existing:
+                existing["warmup"] = self._default_warmup()
                 changed = True
             if changed:
                 self.memory.upsert_adaptation_profile(existing, source="profile_backfill")
@@ -71,6 +98,17 @@ class OnboardingService:
         anchors = b.get("interest_anchors", [])
         if isinstance(anchors, list):
             out["interest_anchors"] = [str(x).strip() for x in anchors if str(x).strip()][:20]
+
+        warmup_cfg = b.get("warmup_runs", {})
+        warm = out.setdefault("warmup", self._default_warmup())
+        warm_enabled = bool(warmup_cfg.get("enabled", False))
+        warm["enabled"] = warm_enabled
+        warm["same_child"] = bool(warmup_cfg.get("same_child", True))
+        warm["total_runs"] = int(warmup_cfg.get("total_runs", 3) or 3)
+        warm["current_run"] = 1
+        warm["completed_runs"] = 0
+        warm["active"] = warm_enabled
+        warm["updated_at"] = time.time()
 
         out["parent_notes"] = b.get("learning_notes", {})
         out["updated_at"] = time.time()
@@ -133,7 +171,64 @@ class OnboardingService:
             "strengths": strengths,
             "friction_points": friction,
             "suggested_pacing": "short_visual_tasks_with_choice",
-            "starter_plan_7d": plan
+            "starter_plan_7d": plan,
+            "warmup": self.get_warmup_status()
+        }
+
+    def finalize_onboarding_session(self, session_id, session_metrics):
+        summary = self.summarize_for_parent(session_metrics)
+        profile = self.get_or_init_profile()
+        out = deepcopy(profile)
+        warm = out.setdefault("warmup", self._default_warmup())
+        now = time.time()
+        if warm.get("enabled", False) and warm.get("active", False):
+            run = int(warm.get("current_run", 1) or 1)
+            total = max(1, int(warm.get("total_runs", 3) or 3))
+            warm.setdefault("run_history", []).append({
+                "run": run,
+                "session_id": str(session_id),
+                "ts": now,
+            })
+            warm["run_history"] = warm["run_history"][-20:]
+            warm["completed_runs"] = max(int(warm.get("completed_runs", 0)), run)
+            if run < total:
+                warm["current_run"] = run + 1
+                warm["active"] = True
+                summary["warmup"] = {
+                    "status": "continue",
+                    "current_run": run,
+                    "next_run": run + 1,
+                    "total_runs": total,
+                    "message": f"Warm-up run {run}/{total} complete. Start run {run + 1} for a more engaging pass."
+                }
+            else:
+                warm["active"] = False
+                summary["warmup"] = {
+                    "status": "completed",
+                    "current_run": run,
+                    "next_run": run,
+                    "total_runs": total,
+                    "message": "Warm-up sequence complete. Bitling is ready for normal companion flow."
+                }
+            warm["updated_at"] = now
+            out["updated_at"] = now
+            out["source"] = "warmup_finalize"
+            self.memory.upsert_adaptation_profile(out, source="warmup_finalize")
+            profile = out
+        else:
+            summary["warmup"] = self.get_warmup_status()
+        return {"summary": summary, "profile": profile}
+
+    def get_warmup_status(self):
+        profile = self.get_or_init_profile()
+        warm = profile.get("warmup", self._default_warmup())
+        return {
+            "enabled": bool(warm.get("enabled", False)),
+            "active": bool(warm.get("active", False)),
+            "same_child": bool(warm.get("same_child", True)),
+            "current_run": int(warm.get("current_run", 1) or 1),
+            "completed_runs": int(warm.get("completed_runs", 0) or 0),
+            "total_runs": int(warm.get("total_runs", 3) or 3),
         }
 
     def get_world_anchor(self):
@@ -610,6 +705,7 @@ class OnboardingService:
             "first_contact": self._default_first_contact(),
             "trust": self._default_trust_model(),
             "world_anchor": self._default_world_anchor(),
+            "warmup": self._default_warmup(),
         }
 
     def _default_first_contact(self):
@@ -620,6 +716,29 @@ class OnboardingService:
             "max_minutes": 5,
             "interactions": 0,
         }
+
+    def _default_warmup(self):
+        return {
+            "enabled": False,
+            "active": False,
+            "same_child": True,
+            "total_runs": 3,
+            "current_run": 1,
+            "completed_runs": 0,
+            "run_history": [],
+            "updated_at": time.time(),
+        }
+
+    def _warmup_intensity(self, run_idx, total_runs):
+        r = max(1, int(run_idx))
+        t = max(1, int(total_runs))
+        if t <= 1:
+            return "high"
+        if r <= 1:
+            return "low"
+        if r >= t:
+            return "high"
+        return "medium"
 
     def _default_world_anchor(self):
         return {

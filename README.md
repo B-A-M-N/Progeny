@@ -60,6 +60,7 @@ The first session is designed as a relationship-building flow, not an assessment
 It runs in a short first-contact mode (about 3–5 minutes), prioritizing mystery/play over direct teaching.
 
 - Parent can optionally provide baseline context.
+- Parent can enable a same-child warm-up sequence (3 independent short runs) to build comfort.
 - Child goes through playful world-building prompts.
 - Signals are collected quietly (latency, writing pressure, pauses, retries, etc.).
 - The system builds an adaptive baseline from behavior patterns, not labels.

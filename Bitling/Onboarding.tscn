@@ -210,6 +210,10 @@ custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 placeholder_text = "Notes: frustration cues, calming supports, school struggles..."
 
+[node name="WarmupToggle" type="CheckBox" parent="Root/TabContainer/Parent/ParentVBox"]
+layout_mode = 2
+text = "Same child, warm-up runs (3 short sessions, increasingly engaging)"
+
 [node name="ParentButtons" type="HBoxContainer" parent="Root/TabContainer/Parent/ParentVBox"]
 layout_mode = 2
 theme_override_constants/separation = 10

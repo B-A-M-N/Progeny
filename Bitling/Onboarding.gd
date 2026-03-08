@@ -11,6 +11,7 @@ var session_id := "first_run"
 var script_items: Array = []
 var script_index := 0
 var prompt_started_ms := 0
+var warmup_info := {"enabled": false, "active": false, "current_run": 1, "completed_runs": 0, "total_runs": 3}
 
 @onready var status_label = $Root/TopBar/StatusLabel
 @onready var tabs = $Root/TabContainer
@@ -20,6 +21,7 @@ var prompt_started_ms := 0
 @onready var begin_child_button = $Root/TabContainer/Parent/ParentVBox/ParentButtons/BeginChildButton
 @onready var go_main_button = $Root/TabContainer/Parent/ParentVBox/ParentButtons/GoMainButton
 @onready var parent_summary = $Root/TabContainer/Parent/ParentVBox/Summary
+@onready var warmup_toggle = $Root/TabContainer/Parent/ParentVBox/WarmupToggle
 
 @onready var age_spin = $Root/TabContainer/Parent/ParentVBox/Grid/AgeSpin
 @onready var comm_mode = $Root/TabContainer/Parent/ParentVBox/Grid/CommMode
@@ -63,6 +65,7 @@ func _ready():
 	if finish_button:
 		finish_button.pressed.connect(_finish_onboarding)
 	_set_child_controls_enabled(false)
+	_update_warmup_hint()
 	_set_status("Connecting to brain...")
 
 func _process(delta):
@@ -128,12 +131,17 @@ func _handle_message(json_str: String):
 			parent_summary.text = "Current World: " + location + "\nTrust stage: " + stage + "\nWriting Pad: " + pad_url + "\nWriting QR: " + pad_qr_url
 		"onboarding_script":
 			script_items = data.get("items", [])
+			warmup_info = data.get("warmup", warmup_info)
 			script_index = 0
+			_set_session_id_for_run()
 			_set_child_controls_enabled(script_items.size() > 0)
 			_show_current_prompt()
+			_update_warmup_hint()
 		"onboarding_profile_updated":
 			var p = data.get("profile", {})
+			warmup_info = data.get("warmup", warmup_info)
 			parent_summary.text = "Saved baseline.\nInterests: " + ", ".join(p.get("interest_anchors", []))
+			_update_warmup_hint()
 		"onboarding_runtime_update":
 			var neuro = data.get("neurodiversity", {})
 			var style = neuro.get("communication", {}).get("style", "declarative")
@@ -143,11 +151,15 @@ func _handle_message(json_str: String):
 			var strengths = s.get("strengths", [])
 			var friction = s.get("friction_points", [])
 			var plan = s.get("starter_plan_7d", [])
+			var warm = s.get("warmup", {})
 			var trust = data.get("trust_model", {})
 			var world = data.get("world_anchor", {})
+			warmup_info = data.get("warmup", warmup_info)
 			var stage = str(trust.get("stage", "safety"))
 			var location = str(world.get("location", "world")).replace("_", " ")
-			parent_summary.text = "Session Summary\nWorld: " + location + "\nTrust: " + stage + "\n\nStrengths:\n- " + "\n- ".join(strengths) + "\n\nFriction:\n- " + "\n- ".join(friction) + "\n\n7-Day Plan:\n- " + "\n- ".join(plan)
+			var warm_msg = str(warm.get("message", ""))
+			parent_summary.text = "Session Summary\nWorld: " + location + "\nTrust: " + stage + "\nWarm-up: " + warm_msg + "\n\nStrengths:\n- " + "\n- ".join(strengths) + "\n\nFriction:\n- " + "\n- ".join(friction) + "\n\n7-Day Plan:\n- " + "\n- ".join(plan)
+			_update_warmup_hint()
 			if tabs:
 				tabs.current_tab = 0
 
@@ -170,6 +182,7 @@ func _on_begin_child_pressed():
 	if tabs:
 		tabs.current_tab = 1
 	_set_status("Child session started.")
+	_update_warmup_hint()
 
 func _collect_parent_baseline() -> Dictionary:
 	return {
@@ -186,6 +199,11 @@ func _collect_parent_baseline() -> Dictionary:
 		"regulation_signals": {
 			"demand_avoidance": _option_text(demand_pref),
 			"recovery_speed": _option_text(recovery_pref)
+		},
+		"warmup_runs": {
+			"enabled": bool(warmup_toggle.button_pressed) if warmup_toggle else false,
+			"same_child": true,
+			"total_runs": 3
 		},
 		"autism_traits": float(autism_slider.value),
 		"adhd_traits": float(adhd_slider.value),
@@ -272,3 +290,20 @@ func _set_child_controls_enabled(enabled: bool):
 func _set_status(text: String):
 	if status_label:
 		status_label.text = text
+
+func _set_session_id_for_run():
+	var run_idx = int(warmup_info.get("current_run", 1))
+	session_id = "run_%d_%d" % [run_idx, Time.get_unix_time_from_system()]
+
+func _update_warmup_hint():
+	if not begin_child_button:
+		return
+	var enabled = bool(warmup_info.get("enabled", false))
+	var active = bool(warmup_info.get("active", false))
+	var run_idx = int(warmup_info.get("current_run", 1))
+	var total = int(warmup_info.get("total_runs", 3))
+	if enabled and active:
+		begin_child_button.text = "Begin Warm-up Run %d/%d" % [run_idx, total]
+		child_hint.text = "Warm-up mode: same short flow, three independent runs, increasing engagement each run."
+	else:
+		begin_child_button.text = "Begin Child Session"
