@@ -234,6 +234,24 @@ func handle_message(json_str: String):
 				var state = data.get("state")
 				if state == "RESEARCHING":
 					trigger_action("thinking", 3.0)
+			"lesson_plan":
+				var subject = str(data.get("subject", "topic"))
+				var lesson = data.get("lesson", {})
+				var hook = str(lesson.get("hook", "Let's learn together."))
+				var facts = lesson.get("facts", [])
+				var activity = str(lesson.get("activity", "Let's try one tiny step."))
+				if status_label:
+					status_label.text = ("LESSON: " + subject + " | " + hook).to_upper()
+				if chat_log:
+					var msg = "\n[b]Bitling Lesson (" + subject + "):[/b] " + hook
+					if typeof(facts) == TYPE_ARRAY and facts.size() > 0:
+						msg += "\n- " + str(facts[0])
+						if facts.size() > 1:
+							msg += "\n- " + str(facts[1])
+						if facts.size() > 2:
+							msg += "\n- " + str(facts[2])
+					msg += "\n[b]Activity:[/b] " + activity
+					chat_log.text += msg
 
 func trigger_action(action_name: String, duration: float):
 	current_action = action_name

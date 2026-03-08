@@ -172,6 +172,39 @@ class MemoryService:
                 metadata JSONB
             )
         ''')
+
+        # 11. Media Session Tracking (watch + behavior context)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS media_sessions (
+                id SERIAL PRIMARY KEY,
+                session_id TEXT UNIQUE,
+                topic TEXT,
+                title TEXT,
+                url TEXT,
+                started_at REAL,
+                ended_at REAL,
+                watched_seconds DOUBLE PRECISION DEFAULT 0,
+                completed BOOLEAN DEFAULT FALSE,
+                baseline_state JSONB,
+                end_state JSONB,
+                behavior_delta JSONB,
+                metadata JSONB
+            )
+        ''')
+
+        # 12. Post-watch probes (optional, low-pressure)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS media_probes (
+                id SERIAL PRIMARY KEY,
+                timestamp REAL,
+                session_id TEXT,
+                probe_type TEXT,
+                response_mode TEXT,
+                response_latency DOUBLE PRECISION,
+                success_score DOUBLE PRECISION,
+                metadata JSONB
+            )
+        ''')
         
         cursor.execute('''
             INSERT INTO tutor_profile (id, name, appearance, attitude, level, xp)
@@ -388,6 +421,183 @@ class MemoryService:
         conn.commit()
         cursor.close()
         conn.close()
+
+    def start_media_session(self, session_id, topic, title="", url="", baseline_state=None, metadata=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO media_sessions (
+                session_id, topic, title, url, started_at, baseline_state, metadata
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (session_id) DO UPDATE SET
+                topic = EXCLUDED.topic,
+                title = EXCLUDED.title,
+                url = EXCLUDED.url,
+                started_at = EXCLUDED.started_at,
+                baseline_state = EXCLUDED.baseline_state,
+                metadata = EXCLUDED.metadata
+        ''', (
+            str(session_id or ""),
+            str(topic or ""),
+            str(title or ""),
+            str(url or ""),
+            time.time(),
+            json.dumps(baseline_state or {}),
+            json.dumps(metadata or {})
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def end_media_session(self, session_id, watched_seconds=0.0, completed=False, end_state=None, behavior_delta=None, metadata=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE media_sessions
+            SET ended_at = %s,
+                watched_seconds = %s,
+                completed = %s,
+                end_state = %s,
+                behavior_delta = %s,
+                metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE session_id = %s
+        ''', (
+            time.time(),
+            float(watched_seconds or 0.0),
+            bool(completed),
+            json.dumps(end_state or {}),
+            json.dumps(behavior_delta or {}),
+            json.dumps(metadata or {}),
+            str(session_id or "")
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def record_media_probe(self, session_id, probe_type, response_mode="choice", response_latency=0.0, success_score=0.5, metadata=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO media_probes (
+                timestamp, session_id, probe_type, response_mode, response_latency, success_score, metadata
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            time.time(),
+            str(session_id or ""),
+            str(probe_type or ""),
+            str(response_mode or "choice"),
+            float(response_latency or 0.0),
+            float(success_score or 0.0),
+            json.dumps(metadata or {})
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def get_media_effectiveness(self, topic=None, limit=20):
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        if topic:
+            cursor.execute('''
+                SELECT
+                    ms.topic,
+                    count(*) AS sessions,
+                    avg(ms.watched_seconds) AS avg_watched_seconds,
+                    avg(CASE WHEN ms.completed THEN 1 ELSE 0 END) AS completion_rate,
+                    avg(mp.success_score) AS avg_probe_score,
+                    avg(mp.response_latency) AS avg_probe_latency
+                FROM media_sessions ms
+                LEFT JOIN media_probes mp ON mp.session_id = ms.session_id
+                WHERE ms.topic = %s
+                GROUP BY ms.topic
+                LIMIT 1
+            ''', (str(topic),))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return row or {}
+        cursor.execute('''
+            SELECT
+                ms.topic,
+                count(*) AS sessions,
+                avg(ms.watched_seconds) AS avg_watched_seconds,
+                avg(CASE WHEN ms.completed THEN 1 ELSE 0 END) AS completion_rate,
+                avg(mp.success_score) AS avg_probe_score,
+                avg(mp.response_latency) AS avg_probe_latency
+            FROM media_sessions ms
+            LEFT JOIN media_probes mp ON mp.session_id = ms.session_id
+            GROUP BY ms.topic
+            ORDER BY sessions DESC, avg_probe_score DESC NULLS LAST
+            LIMIT %s
+        ''', (int(limit),))
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return rows
+
+    def get_recent_learning_context(self, subject=None, window_seconds=3600):
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        since_ts = time.time() - float(window_seconds)
+
+        # Recent struggles
+        if subject:
+            cursor.execute('''
+                SELECT description, severity, timestamp
+                FROM struggles
+                WHERE timestamp >= %s AND (subject = %s OR subject = 'general')
+                ORDER BY timestamp DESC
+                LIMIT 20
+            ''', (since_ts, str(subject)))
+        else:
+            cursor.execute('''
+                SELECT description, severity, timestamp
+                FROM struggles
+                WHERE timestamp >= %s
+                ORDER BY timestamp DESC
+                LIMIT 20
+            ''', (since_ts,))
+        struggles = cursor.fetchall()
+
+        # Recent onboarding/interaction metrics
+        cursor.execute('''
+            SELECT metric_key, avg(metric_value) AS avg_value, count(*) AS n
+            FROM onboarding_metrics
+            WHERE timestamp >= %s
+            GROUP BY metric_key
+            ORDER BY n DESC
+            LIMIT 20
+        ''', (since_ts,))
+        onboarding_metrics = cursor.fetchall()
+
+        # Recent event stats
+        cursor.execute('''
+            SELECT event_type, count(*) AS n
+            FROM events
+            WHERE timestamp >= %s
+            GROUP BY event_type
+            ORDER BY n DESC
+            LIMIT 20
+        ''', (since_ts,))
+        event_counts = cursor.fetchall()
+
+        # Adaptation profile snapshot
+        cursor.execute('SELECT profile FROM adaptation_profile WHERE id = 1')
+        row = cursor.fetchone()
+        adaptation = row.get("profile") if row else {}
+
+        cursor.close()
+        conn.close()
+        return {
+            "since_ts": since_ts,
+            "subject": subject,
+            "recent_struggles": struggles or [],
+            "onboarding_metrics": onboarding_metrics or [],
+            "recent_event_counts": event_counts or [],
+            "adaptation_profile": adaptation or {}
+        }
 
     # --- Knowledge Graph Methods ---
 

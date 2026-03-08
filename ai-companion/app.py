@@ -100,6 +100,7 @@ class ProgenyEngine:
         self.connected_clients = set()
         self.current_onboarding_session = {}
         self.recent_adaptive_signals = {}
+        self.active_media_sessions = {}
 
     def get_active_neuro_profile(self):
         adapted = self.onboarding.get_or_init_profile()
@@ -314,6 +315,104 @@ class ProgenyEngine:
                         "summary": summary,
                         "profile": self.onboarding.get_or_init_profile()
                     }))
+                elif msg_type == "start_media_session":
+                    session_id = str(data.get("session_id", f"media_{int(time.time())}"))
+                    topic = str(data.get("topic", "general"))
+                    title = str(data.get("title", ""))
+                    url = str(data.get("url", ""))
+                    baseline_state = self.onboarding.estimate_live_state(self.state_svc.get_summary(), self.recent_adaptive_signals)
+                    self.active_media_sessions[session_id] = {
+                        "started_at": time.time(),
+                        "baseline_state": baseline_state,
+                        "topic": topic,
+                        "title": title,
+                        "url": url,
+                    }
+                    self.memory.start_media_session(
+                        session_id=session_id,
+                        topic=topic,
+                        title=title,
+                        url=url,
+                        baseline_state=baseline_state,
+                        metadata=data.get("metadata", {})
+                    )
+                    await websocket.send(json.dumps({
+                        "type": "media_session_started",
+                        "session_id": session_id,
+                        "topic": topic
+                    }))
+                elif msg_type == "media_probe_event":
+                    session_id = str(data.get("session_id", ""))
+                    probe_type = str(data.get("probe_type", "choice_recall"))
+                    response_mode = str(data.get("response_mode", "choice"))
+                    response_latency = float(data.get("response_latency", 0.0) or 0.0)
+                    success_score = float(data.get("success_score", 0.5) or 0.5)
+                    self.memory.record_media_probe(
+                        session_id=session_id,
+                        probe_type=probe_type,
+                        response_mode=response_mode,
+                        response_latency=response_latency,
+                        success_score=success_score,
+                        metadata=data.get("metadata", {})
+                    )
+                    await websocket.send(json.dumps({
+                        "type": "media_probe_recorded",
+                        "session_id": session_id,
+                        "probe_type": probe_type
+                    }))
+                elif msg_type == "end_media_session":
+                    session_id = str(data.get("session_id", ""))
+                    live = self.active_media_sessions.get(session_id, {})
+                    baseline_state = live.get("baseline_state", {})
+                    end_state = self.onboarding.estimate_live_state(self.state_svc.get_summary(), self.recent_adaptive_signals)
+                    behavior_delta = {
+                        "frustration": [baseline_state.get("frustration", "none"), end_state.get("frustration", "none")],
+                        "engagement": [baseline_state.get("engagement", "none"), end_state.get("engagement", "none")],
+                        "regulation": [baseline_state.get("regulation", "regulated"), end_state.get("regulation", "regulated")]
+                    }
+                    watched_seconds = float(data.get("watched_seconds", 0.0) or 0.0)
+                    if watched_seconds <= 0 and live.get("started_at"):
+                        watched_seconds = max(0.0, time.time() - float(live.get("started_at")))
+                    completed = bool(data.get("completed", False))
+                    self.memory.end_media_session(
+                        session_id=session_id,
+                        watched_seconds=watched_seconds,
+                        completed=completed,
+                        end_state=end_state,
+                        behavior_delta=behavior_delta,
+                        metadata=data.get("metadata", {})
+                    )
+                    topic = live.get("topic") or data.get("topic")
+                    insight = self.memory.get_media_effectiveness(topic=topic) if topic else {}
+                    await websocket.send(json.dumps({
+                        "type": "media_session_ended",
+                        "session_id": session_id,
+                        "behavior_delta": behavior_delta,
+                        "effectiveness": insight
+                    }))
+                    if session_id in self.active_media_sessions:
+                        del self.active_media_sessions[session_id]
+                elif msg_type == "get_media_insights":
+                    topic = data.get("topic")
+                    if topic:
+                        insight = self.memory.get_media_effectiveness(topic=topic)
+                    else:
+                        insight = self.memory.get_media_effectiveness(limit=20)
+                    await websocket.send(json.dumps({
+                        "type": "media_insights",
+                        "topic": topic,
+                        "insights": insight
+                    }))
+                elif msg_type == "get_media_probe_pack":
+                    await websocket.send(json.dumps({
+                        "type": "media_probe_pack",
+                        "items": [
+                            {"id": "choice_recall", "prompt": "Pick one: what was this mostly about?", "mode": "choice"},
+                            {"id": "draw_recall", "prompt": "Show me the part you remember best.", "mode": "drawing"},
+                            {"id": "order_check", "prompt": "What happened first?", "mode": "choice"},
+                            {"id": "tiny_transfer", "prompt": "Want to try one tiny thing from that video?", "mode": "choice"}
+                        ]
+                    }))
         except websockets.exceptions.ConnectionClosed as e:
             print(f"[WebSocket] ConnectionClosed: {e}")
         except Exception as e:
@@ -473,8 +572,18 @@ class ProgenyEngine:
                         if quality != "low" or self.resources.can_run_background_task():
                             await self.change_state(State.PLANNING_LESSON)
                             interest = summary.get("current_interest", "trains")
-                            report = self.lesson_planner.plan_lesson(interest, quality=quality)
-                            text = f"I spent some time learning about {interest}! I have a special report ready for later."
+                            lesson_obj = self.lesson_planner.plan_lesson_dynamic(
+                                interest,
+                                quality=quality,
+                                live_state=live_state,
+                                adaptive_policy=adaptive_policy
+                            )
+                            await self.broadcast({
+                                "type": "lesson_plan",
+                                "subject": interest,
+                                "lesson": lesson_obj
+                            })
+                            text = str(lesson_obj.get("hook", f"Let's learn about {interest} together."))
                         else:
                             print("[Engine] Throttling Lesson Plan - System Pegged")
                             text = "I'm looking forward to learning more about that soon!"
