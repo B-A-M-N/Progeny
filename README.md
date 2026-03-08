@@ -1,17 +1,40 @@
 # Progeny (Bitling)
 
+An AI learning companion built for real kids in real homes, not a demo.
+
 ## Why This Exists
 
-AI is becoming a core part of how kids will learn. Progeny is being built around one premise:
+As AI becomes more relevant to education, kids are increasingly learning *with* AI, not just from static apps.  
+Progeny was created to make that useful, safe, and human-centered.
 
-- children can learn faster and stay engaged longer when learning is interactive, personalized, and tied to their interests.
+Most children’s apps are either:
 
-There are very few tools that are explicitly built for **neurodivergent kids** while also being useful for all children.  
-Progeny is meant to be:
+- generic drill tools with no personalization, or
+- “AI toys” that are flashy but not built around real developmental needs.
 
-- an educational companion for any child,
-- plus a practical support tool for parents of neurodivergent children (Autism/ADHD/AuDHD),
-- by connecting learning goals to the child’s real interests and sensory/communication needs.
+There are also almost no systems designed specifically for neurodivergent learners while still working for all kids.
+
+Progeny’s purpose:
+
+- help children learn faster by linking new skills to their actual interests,
+- support neurodivergent learning needs (Autism/ADHD/AuDHD),
+- give parents practical visibility into effort, struggles, and progress,
+- stay local-first so families keep control of their child’s data and workflow.
+
+## Who This Is For
+
+- Children who learn better through interaction and character-based guidance.
+- Parents who want to scaffold learning at home without guesswork.
+- Neurodivergent families needing adaptable sensory/communication support.
+- Builders/educators who want a customizable local tutor stack.
+
+## Design Principles
+
+- Interest-first: connect lessons to what the child already cares about.
+- Scaffold, don’t overwhelm: small wins, clear feedback, repeatable routine.
+- Local-first by default: keep core data and behaviors on-device.
+- Parent visibility: progress and friction should be observable, not hidden.
+- Practical over hype: if it doesn’t improve daily learning, it doesn’t ship.
 
 ## What Progeny Is
 
