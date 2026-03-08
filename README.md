@@ -2,6 +2,8 @@
 
 Progeny is an AI learning companion built for real kids, real families, and real everyday struggles.
 
+Implementation spec: [Bitling Runtime Architecture](docs/bitling_runtime_architecture.md)
+
 ## Our Mission
 
 Kids are growing up in a world where AI is part of learning whether we like it or not.
