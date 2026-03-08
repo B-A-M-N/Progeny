@@ -150,6 +150,28 @@ class MemoryService:
                 UNIQUE(source_id, target_id, rel_type)
             )
         ''')
+
+        # 9. Neuroadaptive Onboarding / Runtime Adaptation Profile
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS adaptation_profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                profile JSONB NOT NULL,
+                source TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # 10. Onboarding Session Metrics
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS onboarding_metrics (
+                id SERIAL PRIMARY KEY,
+                timestamp REAL,
+                session_id TEXT,
+                metric_key TEXT,
+                metric_value DOUBLE PRECISION,
+                metadata JSONB
+            )
+        ''')
         
         cursor.execute('''
             INSERT INTO tutor_profile (id, name, appearance, attitude, level, xp)
@@ -323,6 +345,49 @@ class MemoryService:
         cursor.close()
         conn.close()
         return res
+
+    def upsert_adaptation_profile(self, profile, source="unknown"):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO adaptation_profile (id, profile, source, updated_at)
+            VALUES (1, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET
+                profile = EXCLUDED.profile,
+                source = EXCLUDED.source,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (json.dumps(profile or {}), source))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    def get_adaptation_profile(self):
+        conn = self.get_conn()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT profile FROM adaptation_profile WHERE id = 1')
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if not row:
+            return None
+        return row.get("profile")
+
+    def record_onboarding_metric(self, session_id, metric_key, metric_value, metadata=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO onboarding_metrics (timestamp, session_id, metric_key, metric_value, metadata)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (
+            time.time(),
+            str(session_id or ""),
+            str(metric_key or ""),
+            float(metric_value or 0.0),
+            json.dumps(metadata or {})
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
 
     # --- Knowledge Graph Methods ---
 

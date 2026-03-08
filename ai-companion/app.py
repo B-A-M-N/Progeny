@@ -20,6 +20,7 @@ from services.content_service import ContentService
 from services.lesson_plan_service import LessonPlanService
 from services.creation_service import CreationService
 from services.resource_service import ResourceService
+from services.onboarding_service import OnboardingService
 from utils.local_server import LocalAudioServer
 from utils.writing_server import app as writing_app
 import threading
@@ -86,6 +87,7 @@ class ProgenyEngine:
             agent_model=self.role_models['researcher']
         )
         self.creation_svc = CreationService(self.config, agent_model=self.role_models['playmate'])
+        self.onboarding = OnboardingService(self.memory, self.config)
         self.caster = CastService(host=self.config['cast']['host_ip'])
         self.server = LocalAudioServer(port=self.config['system']['port'])
         self.writing_server_port = self.config['system'].get('writing_port', 5000)
@@ -96,6 +98,15 @@ class ProgenyEngine:
         
         # WebSocket clients (Godot UI)
         self.connected_clients = set()
+        self.current_onboarding_session = {}
+        self.recent_adaptive_signals = {}
+
+    def get_active_neuro_profile(self):
+        adapted = self.onboarding.get_or_init_profile()
+        neuro = adapted.get("neurodiversity_profile", {})
+        if neuro:
+            return neuro
+        return self.config.get('child', {}).get('neurodiversity_profile', {})
 
     def load_config(self, path):
         project_root = os.path.dirname(os.path.abspath(__file__))
@@ -138,7 +149,8 @@ class ProgenyEngine:
                     open_brain_ok = False
                     open_brain_detail = f"profile_load_failed: {type(e).__name__}: {e}"
             gen_config = self.config.get('generation', {})
-            neuro_profile = self.config.get('child', {}).get('neurodiversity_profile', {})
+            neuro_profile = self.get_active_neuro_profile()
+            adaptation = self.onboarding.get_or_init_profile()
             
             # Auto-detect if local is actually available
             is_local = self.creation_svc.is_local_available()
@@ -153,6 +165,7 @@ class ProgenyEngine:
                 "type": "init", 
                 "profile": profile,
                 "neurodiversity": neuro_profile,
+                "adaptation_profile": adaptation,
                 "open_brain": {
                     "connected": open_brain_ok,
                     "detail": open_brain_detail
@@ -255,6 +268,52 @@ class ProgenyEngine:
                         appearance=data.get("appearance"),
                         attitude=data.get("attitude")
                     )
+                elif msg_type == "get_onboarding_script":
+                    await websocket.send(json.dumps({
+                        "type": "onboarding_script",
+                        "items": self.onboarding.get_session_script(),
+                        "profile": self.onboarding.get_or_init_profile()
+                    }))
+                elif msg_type == "set_parent_baseline":
+                    baseline = data.get("baseline", {})
+                    profile = self.onboarding.apply_parent_baseline(baseline)
+                    await websocket.send(json.dumps({
+                        "type": "onboarding_profile_updated",
+                        "profile": profile,
+                        "neurodiversity": profile.get("neurodiversity_profile", {})
+                    }))
+                elif msg_type == "onboarding_event":
+                    session_id = str(data.get("session_id", "default"))
+                    event = data.get("event", {})
+                    metric_key = str(event.get("metric_key", "")).strip()
+                    metric_value = event.get("metric_value", 0.0)
+                    if metric_key:
+                        self.memory.record_onboarding_metric(
+                            session_id=session_id,
+                            metric_key=metric_key,
+                            metric_value=metric_value,
+                            metadata=event.get("metadata", {})
+                        )
+                    self.current_onboarding_session.setdefault(session_id, {})
+                    if metric_key:
+                        self.current_onboarding_session[session_id][metric_key] = float(metric_value or 0.0)
+                        self.recent_adaptive_signals[metric_key] = float(metric_value or 0.0)
+                    updated = self.onboarding.apply_runtime_metrics(self.current_onboarding_session[session_id])
+                    await websocket.send(json.dumps({
+                        "type": "onboarding_runtime_update",
+                        "profile": updated,
+                        "neurodiversity": updated.get("neurodiversity_profile", {})
+                    }))
+                elif msg_type == "finish_onboarding":
+                    session_id = str(data.get("session_id", "default"))
+                    metrics = self.current_onboarding_session.get(session_id, {})
+                    summary = self.onboarding.summarize_for_parent(metrics)
+                    await websocket.send(json.dumps({
+                        "type": "onboarding_summary",
+                        "session_id": session_id,
+                        "summary": summary,
+                        "profile": self.onboarding.get_or_init_profile()
+                    }))
         except websockets.exceptions.ConnectionClosed as e:
             print(f"[WebSocket] ConnectionClosed: {e}")
         except Exception as e:
@@ -347,6 +406,16 @@ class ProgenyEngine:
 
                 self.state_svc.update_from_vision(vision_desc)
                 summary = self.state_svc.get_summary()
+                live_state = self.onboarding.estimate_live_state(summary, self.recent_adaptive_signals)
+                adaptive_policy = self.onboarding.render_adaptive_policy(live_state)
+                summary_for_agent = dict(summary)
+                summary_for_agent["adaptive_state"] = live_state
+                summary_for_agent["adaptive_policy"] = adaptive_policy
+                await self.broadcast({
+                    "type": "adaptive_state",
+                    "state": live_state,
+                    "policy": adaptive_policy
+                })
                 
                 if summary.get("visible_objects"):
                     for obj in summary["visible_objects"]:
@@ -362,7 +431,16 @@ class ProgenyEngine:
                     profile = self.memory.get_tutor_profile()
                     learning_stage = self.memory.get_learning_stage()
 
-                    decision = self.agent.get_response(summary, vision_desc, brain_context, lesson_context, tutor_profile=profile, learning_stage=learning_stage)
+                    active_neuro = self.get_active_neuro_profile()
+                    decision = self.agent.get_response(
+                        summary_for_agent,
+                        vision_desc,
+                        brain_context,
+                        lesson_context,
+                        tutor_profile=profile,
+                        learning_stage=learning_stage,
+                        neuro_profile=active_neuro
+                    )
                     action = decision.get("action", "comment_observation")
                     text = decision.get("text", "")
 
