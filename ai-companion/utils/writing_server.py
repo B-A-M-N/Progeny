@@ -1,9 +1,12 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 import os
 import json
 import base64
 import time
 import yaml
+import io
+import urllib.parse
+import socket
 from services.memory_service import MemoryService
 from services.onboarding_service import OnboardingService
 
@@ -27,6 +30,14 @@ if os.path.exists(config_path):
         cfg = {}
 onboarding = OnboardingService(memory, cfg)
 active_media_sessions = {}
+
+
+def _detect_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    local_ip = s.getsockname()[0]
+    s.close()
+    return local_ip
 
 
 def _compute_stroke_metrics(strokes):
@@ -69,6 +80,35 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     return send_from_directory(DATA_DIR, 'dashboard.html')
+
+
+@app.route('/api/writing/qr', methods=['GET'])
+def writing_qr():
+    target = request.args.get("target", "").strip()
+    if target == "":
+        local_ip = _detect_local_ip()
+        target = f"http://{local_ip}:5000/"
+    try:
+        import qrcode
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(target)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return send_file(buf, mimetype="image/png")
+    except Exception:
+        escaped = urllib.parse.quote(target, safe="")
+        html = (
+            "<html><body style='font-family:sans-serif;padding:24px;'>"
+            "<h2>Writing Pad Link</h2>"
+            f"<p><a href='{target}'>{target}</a></p>"
+            f"<p>Install qrcode+pillow for PNG QR output.</p>"
+            f"<p>Encoded: {escaped}</p>"
+            "</body></html>"
+        )
+        return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 @app.route('/api/struggles')
 def get_struggles():
@@ -267,10 +307,7 @@ def media_insights():
 if __name__ == '__main__':
     # Get local IP for convenience
     import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    local_ip = s.getsockname()[0]
-    s.close()
+    local_ip = _detect_local_ip()
     
     print(f"--- Writing Server Started ---")
     print(f"Access on Kindle at: http://{local_ip}:5000")

@@ -21,6 +21,7 @@ var neuro_profile = {}
 var trust_model = {}
 var world_anchor = {}
 var writing_pad_url = ""
+var writing_pad_qr_url = ""
 var current_action = ""
 var action_time = 0.0
 var is_dragging = false
@@ -33,7 +34,9 @@ const MENU_PIN_TOGGLE := 3
 const MENU_HIDE_CHAT := 4
 const MENU_OPEN_PAD := 5
 const MENU_SHOW_PAD_URL := 6
-const MENU_QUIT := 7
+const MENU_OPEN_PAD_QR := 7
+const MENU_SHOW_PAD_QR_URL := 8
+const MENU_QUIT := 9
 
 func _ready():
 	_configure_overlay_window()
@@ -64,6 +67,8 @@ func _setup_ui():
 		overlay_menu.add_item("Hide Chat", MENU_HIDE_CHAT)
 		overlay_menu.add_item("Open Writing Pad", MENU_OPEN_PAD)
 		overlay_menu.add_item("Show Writing URL", MENU_SHOW_PAD_URL)
+		overlay_menu.add_item("Open Writing QR", MENU_OPEN_PAD_QR)
+		overlay_menu.add_item("Show Writing QR URL", MENU_SHOW_PAD_QR_URL)
 		overlay_menu.add_separator()
 		overlay_menu.add_item("Quit", MENU_QUIT)
 		overlay_menu.id_pressed.connect(_on_menu_id_pressed)
@@ -201,6 +206,10 @@ func _on_menu_id_pressed(id: int):
 			_open_writing_pad()
 		MENU_SHOW_PAD_URL:
 			_show_writing_pad_url()
+		MENU_OPEN_PAD_QR:
+			_open_writing_pad_qr()
+		MENU_SHOW_PAD_QR_URL:
+			_show_writing_pad_qr_url()
 		MENU_QUIT:
 			get_tree().quit()
 
@@ -227,6 +236,7 @@ func handle_message(json_str: String):
 				trust_model = data.get("trust_model", {})
 				world_anchor = data.get("world_anchor", {})
 				writing_pad_url = str(data.get("writing_pad_url", ""))
+				writing_pad_qr_url = str(data.get("writing_pad_qr_url", ""))
 				apply_sensory_settings()
 				var name = data.get("profile", {}).get("name", "Bitling")
 				var ob = data.get("open_brain", {})
@@ -241,6 +251,8 @@ func handle_message(json_str: String):
 					chat_log.text += "\n[b]Bitling:[/b] " + greeting
 				if chat_log and writing_pad_url != "":
 					chat_log.text += "\n[i]Writing pad:[/i] " + writing_pad_url
+				if chat_log and writing_pad_qr_url != "":
+					chat_log.text += "\n[i]Writing QR:[/i] " + writing_pad_qr_url
 				print("[OpenBrain] ", ob_text, " detail=", str(ob.get("detail", "")))
 				
 			"speak":
@@ -285,8 +297,11 @@ func handle_message(json_str: String):
 				world_anchor = data.get("world_anchor", world_anchor)
 				trust_model = data.get("trust_model", trust_model)
 				var pad_url = str(data.get("writing_pad_url", ""))
+				var pad_qr_url = str(data.get("writing_pad_qr_url", ""))
 				if pad_url != "":
 					writing_pad_url = pad_url
+				if pad_qr_url != "":
+					writing_pad_qr_url = pad_qr_url
 				var line = _world_status_line()
 				if status_label:
 					status_label.text = line.to_upper()
@@ -301,6 +316,7 @@ func handle_message(json_str: String):
 					chat_log.text += "\n[i]Trust grew to:[/i] " + stage2
 			"writing_pad_info":
 				writing_pad_url = str(data.get("url", writing_pad_url))
+				writing_pad_qr_url = str(data.get("qr_url", writing_pad_qr_url))
 				_show_writing_pad_url()
 
 func trigger_action(action_name: String, duration: float):
@@ -405,6 +421,29 @@ func _show_writing_pad_url():
 		chat_log.text += "\n[i]Tablet/Kindle URL:[/i] " + writing_pad_url
 	if status_label:
 		status_label.text = ("WRITING PAD: " + writing_pad_url).to_upper()
+
+func _open_writing_pad_qr():
+	if writing_pad_qr_url == "":
+		if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+			socket.send_text(JSON.stringify({"type": "get_writing_pad_url"}))
+		if status_label:
+			status_label.text = "REQUESTING WRITING PAD QR..."
+		return
+	OS.shell_open(writing_pad_qr_url)
+	if status_label:
+		status_label.text = ("OPENED WRITING QR: " + writing_pad_qr_url).to_upper()
+
+func _show_writing_pad_qr_url():
+	if writing_pad_qr_url == "":
+		if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+			socket.send_text(JSON.stringify({"type": "get_writing_pad_url"}))
+		if status_label:
+			status_label.text = "WRITING PAD QR URL UNAVAILABLE"
+		return
+	if chat_log:
+		chat_log.text += "\n[i]Writing QR URL:[/i] " + writing_pad_qr_url
+	if status_label:
+		status_label.text = ("WRITING QR: " + writing_pad_qr_url).to_upper()
 
 func trigger_visual_stim():
 	var tween = create_tween()

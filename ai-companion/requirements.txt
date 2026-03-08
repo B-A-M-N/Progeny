@@ -16,6 +16,7 @@ fastembed
 pydantic
 json-repair
 jsonschema
+qrcode[pil]
 
 # Audio / speech / memory
 kokoro-onnx

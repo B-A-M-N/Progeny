@@ -101,6 +101,12 @@ Brain -> Client:
 - `lesson_plan`
 - `speak`
 
+Writing pad convenience:
+
+- `init` includes `writing_pad_url` and `writing_pad_qr_url`
+- `world_state` includes `writing_pad_url` and `writing_pad_qr_url`
+- Writing server QR endpoint: `/api/writing/qr?target=<url>`
+
 Schema files (source of truth for inbound message validation):
 
 - `ai-companion/contracts/ws/*.schema.json`

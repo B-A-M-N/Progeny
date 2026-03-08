@@ -131,6 +131,10 @@ class ProgenyEngine:
             ip = "127.0.0.1"
         return f"http://{ip}:{port}"
 
+    def get_writing_pad_qr_url(self):
+        pad_url = self.get_writing_pad_url()
+        return f"{pad_url}/api/writing/qr?target={pad_url}/"
+
     def _update_adaptive_signal(self, key, value):
         # Accept normalized signals [0..1] and smooth with EMA.
         k = str(key or "").strip()
@@ -247,6 +251,7 @@ class ProgenyEngine:
                 "trust_model": trust_model,
                 "return_greeting": self.onboarding.get_return_greeting(),
                 "writing_pad_url": self.get_writing_pad_url(),
+                "writing_pad_qr_url": self.get_writing_pad_qr_url(),
             }))
             
             async for message in websocket:
@@ -363,11 +368,13 @@ class ProgenyEngine:
                         "trust_model": profile.get("trust", {}),
                         "return_greeting": self.onboarding.get_return_greeting(),
                         "writing_pad_url": self.get_writing_pad_url(),
+                        "writing_pad_qr_url": self.get_writing_pad_qr_url(),
                     }))
                 elif msg_type == "get_writing_pad_url":
                     await websocket.send(json.dumps({
                         "type": "writing_pad_info",
-                        "url": self.get_writing_pad_url()
+                        "url": self.get_writing_pad_url(),
+                        "qr_url": self.get_writing_pad_qr_url(),
                     }))
                 elif msg_type == "world_action":
                     action = data.get("action", "")
