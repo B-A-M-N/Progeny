@@ -1,15 +1,24 @@
-# Standard Libs
+# Core runtime
 requests
 pyyaml
+websockets
+flask
+transitions
+psutil
+
+# Vision / math
 opencv-python
 numpy
 
-# AI Core
+# AI core
 ollama
 fastembed
+pydantic
+json-repair
 
-# Audio / Casting
-pychromecast
-flask
-transitions
-Kokoro-82M # If using pip version, otherwise link locally
+# Audio / speech / memory
+kokoro-onnx
+soundfile
+pychromecast<14.0.0
+psycopg2-binary
+pgvector

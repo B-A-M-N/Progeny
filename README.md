@@ -1,71 +1,69 @@
-# Progeny Engine: Local AI Educational Companion
+# Progeny Engine (Bitling)
 
-**⚠️ VERY EXPERIMENTAL ⚠️**
-**Note: This is a side project because I'm a dad!**
+Local-first tutor companion with a Godot desktop avatar (`Bitling/`) and a Python brain (`ai-companion/`).
 
-The **Progeny Engine** is a local-first, agentic AI designed for early childhood cognitive scaffolding. It uses visual perception, semantic memory, and autonomous research to guide a child's learning based on their intrinsic interests.
+## Current Generation Pipeline
 
-## Features
-- **Semantic Memory (FastEmbed):** Vector-based "Open Brain" to track child interactions.
-- **Autonomous Lesson Planner:** Deep research via Firecrawl/SearXNG with Cross-Encoder reranking.
-- **Struggle Logging:** Proactively identifies and logs developmental difficulties.
-- **Privacy-First:** All data, including vision and voice, is processed locally.
+- `Creator` uses WebSocket to `ai-companion` on port `9001`.
+- Remote image generation uses AI Horde / ArtBot-compatible API.
+- LoRA browser returns Horde-runnable LoRAs only (from Horde default list + metadata).
+- Generated preview is saved to `Bitling/assets/generated/tutor_preview.<ext>`.
+- On low-power dev machines, keep remote generation enabled.
 
-## Prerequisite: Hardware & Host Services
+## Run
 
-### 1. Ollama (Host Machine)
-You must have [Ollama](https://ollama.com/) installed and running. Pull the required models:
 ```bash
-ollama pull moondream   # Vision model
-ollama pull qwen2.5:0.5b # Agent/Logic model
+./run_progeny.sh
 ```
 
-### 2. Redis (Host Machine)
-SearXNG and Firecrawl require a local Redis server.
+This launcher starts supporting services and launches the Godot client.
+
+## Generation Mode Controls
+
+- `PROGENY_FORCE_LOCAL=0 ./run_progeny.sh`
+  - Forces remote generation path.
+- `PROGENY_FORCE_LOCAL=1 ./run_progeny.sh`
+  - Forces local generation only when local SD API is reachable.
+
+## Creator Usage (Remote + LoRAs)
+
+1. Open Creator.
+2. Enter description and style/model.
+3. Click `Browse LoRAs` and select entries.
+4. Click `Generate` or `Regenerate`.
+
+LoRA text format supports:
+
+- `name:weight`
+- `name|id:weight` (preferred when selected from catalog)
+
+Weights are clamped to `[0.0, 2.0]`.
+
+## Overlay / Desktop Companion
+
+Main scene is configured as a borderless, transparent, always-on-top overlay.
+
+Implemented interaction features:
+
+- Drag avatar window.
+- Right-click menu (`Talk`, `Regenerate Avatar`, `Pin/Unpin click-through`, `Hide Chat`, `Quit`).
+- Mini chat panel.
+- Click-through toggle.
+
+## Dependencies
+
+Install Python deps:
+
 ```bash
-sudo apt-get install redis-server
-sudo service redis-server start
+pip install -r ai-companion/requirements.txt
 ```
 
-## Installation (Bare Metal)
+Key runtime deps include: `websockets`, `flask`, `requests`, `ollama`, `opencv-python`, `numpy`, `kokoro-onnx`, `psycopg2-binary`, `pgvector`.
 
-### 1. Setup Support Services
-This script will initialize the local SearXNG (`ai-companion/searxng_server/`) and Firecrawl (`firecrawl-local/`) instances from their source.
-```bash
-chmod +x setup_services.sh
-./setup_services.sh
-```
+## STT Recommendation For Target Machine
 
-### 2. Setup Progeny Engine
-```bash
-cd ai-companion
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+For local STT on the future stronger machine:
 
-## Running the System
+- `whisper.cpp` + Distil-Whisper large-v3 (or quantized medium/large variant)
 
-To run the full suite without Docker, you will need to start three processes:
-
-1.  **SearXNG:**
-    ```bash
-    cd ai-companion/searxng_server && source venv/bin/activate && export SEARXNG_SETTINGS_PATH=./settings.yml && python3 searx/webapp.py
-    ```
-2.  **Firecrawl API:**
-    ```bash
-    cd firecrawl-local/apps/api && npm start
-    ```
-3.  **Progeny Engine:**
-    ```bash
-    cd ai-companion && source venv/bin/activate && python3 app.py
-    ```
-
-## Architecture
-- **State Machine:** Manages the cycle of Perceive -> Decide -> Research -> Speak.
-- **Open Brain:** SQLite-backed vector storage for knowledge and struggles.
-- **Cognitive Scaffolding:** Rule-based and LLM-guided interaction logic.
-
-## Safety & Privacy
-- **Strict Controls:** Blocks topics defined in `config.yaml`.
-- **Local-Only:** No data is sent to external clouds (Ollama, Firecrawl, and SearXNG all run locally).
+This keeps better accuracy/stability than Vosk while staying lighter than the full Whisper Python stack.
