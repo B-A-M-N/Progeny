@@ -1,22 +1,45 @@
-# Progeny Engine (Bitling)
+# Progeny (Bitling)
 
-Local-first tutor companion with:
+Desktop tutor companion stack:
 
-- Godot client: `Bitling/`
-- Python brain: `ai-companion/`
-- Local support services: SearXNG, Firecrawl, Redis, Postgres/pgvector, Kokoro TTS
+- `Bitling/` = Godot 4 client (Creator + overlay companion)
+- `ai-companion/` = Python brain (WebSocket + agent loop + memory + TTS)
+- `services/` = local infra/tooling (Firecrawl, SearXNG, Kokoro assets, optional local SD)
 
-## What Is Working Now
+## What This Is Right Now
 
-- Creator connects to brain over WebSocket (`:9001`).
-- Remote image generation uses AI Horde / ArtBot-style API.
-- LoRA browser returns Horde-runnable entries, and selected IDs are sent in generation payload.
-- Generated previews are saved to `Bitling/assets/generated/tutor_preview.<ext>`.
-- Main companion scene runs as a borderless, transparent desktop overlay.
+This is a **local-first tutor system** with:
 
-## Full Dependency Setup
+- Character creation in Godot.
+- Remote generation via AI Horde/ArtBot path (for low-power dev machines).
+- Open Brain memory in PostgreSQL/pgvector.
+- Overlay companion window (Clippy-style) after character finalize.
+- Kokoro TTS with cache + lightweight post-processing + optional Piper fallback.
 
-### System Packages (Ubuntu/Pop)
+## Working Status (Current)
+
+### Working
+
+- WebSocket handshake between Godot and brain (`ws://<host>:9001`).
+- Creator remote generation requests (construct/tweak over WS).
+- LoRA browse and selection flow (catalog -> field -> request payload).
+- Generated image save/load from `Bitling/assets/generated/`.
+- Main overlay scene connection + action/speech reactions.
+- Open Brain status surfaced in init payload (`connected` + detail).
+- Event/knowledge/struggle/XP logging hooks wired in backend loop.
+- Kokoro TTS generation and serving through local audio server.
+- TTS cache (`ai-companion/data/tts_cache/*.wav`) enabled.
+
+### Expected Constraints
+
+- If PostgreSQL/pgvector is down, memory logging won’t work.
+- If Firecrawl/SearXNG are down, research features degrade.
+- If `PROGENY_PIPER_MODEL` is not set, Piper fallback is skipped.
+- Local SD path requires Automatic1111 API and capable hardware.
+
+## Full Dependencies
+
+## 1) System Packages (Ubuntu/Pop)
 
 ```bash
 sudo apt update
@@ -25,10 +48,15 @@ sudo apt install -y \
   python3 python3-venv \
   libgl1 libglib2.0-0 \
   redis-server \
-  rustc cargo
+  rustc cargo \
+  git-lfs espeak-ng
 ```
 
-### Python Dependencies
+Install Godot 4.x (project currently run with 4.3 in local logs).
+
+## 2) Python Dependencies (`ai-companion`)
+
+Install:
 
 ```bash
 python3 -m venv ai-companion/venv
@@ -37,77 +65,117 @@ pip install --upgrade pip
 pip install -r ai-companion/requirements.txt
 ```
 
-### Node/PNPM (Firecrawl)
+Current required Python packages:
+
+- `requests`
+- `pyyaml`
+- `websockets`
+- `flask`
+- `transitions`
+- `psutil`
+- `opencv-python`
+- `numpy`
+- `ollama`
+- `fastembed`
+- `pydantic`
+- `json-repair`
+- `kokoro-onnx`
+- `soundfile`
+- `pychromecast<14.0.0`
+- `psycopg2-binary`
+- `pgvector`
+
+## 3) Node/PNPM Dependencies (Firecrawl)
+
+Install PNPM:
 
 ```bash
 curl -fsSL https://get.pnpm.io/install.sh | sh -
 export PATH="$HOME/.local/share/pnpm:$PATH"
 ```
 
-### Required Runtime Services
+Firecrawl app deps are installed inside `services/firecrawl` via `pnpm install`.
 
-- Ollama models:
-  - `ollama pull moondream`
-  - `ollama pull qwen2.5:0.5b`
+## 4) Runtime Services Needed
+
 - Redis
-- PostgreSQL + `pgvector`
-- SearXNG
-- Firecrawl API
-- Kokoro voice assets
+- PostgreSQL + pgvector extension
+- SearXNG (`ai-companion/searxng_server`)
+- Firecrawl API (`services/firecrawl/apps/api`)
+- Ollama with models:
+  - `moondream`
+  - `qwen2.5:0.5b`
 
-## Setup Scripts In This Repo
+## 5) TTS Assets
 
-- Full bootstrap: `./setup_all.sh`
-- Tutor-focused setup: `./setup_tutor.sh`
-- Service-only setup: `./setup_services.sh`
-- Postgres setup: `./setup_postgres_bare_metal.sh`
+Kokoro model/voices are expected under repo data paths used by `TTSService`.
 
-Use executable bit first if needed:
+Optional Piper fallback env vars:
+
+- `PROGENY_PIPER_MODEL=/absolute/path/to/piper_model.onnx`
+- `PROGENY_PIPER_BIN=piper` (optional override)
+
+## 6) Optional Local Image Generation
+
+Automatic1111 API at:
+
+- `http://127.0.0.1:7860` (configurable in `ai-companion/config.yaml`)
+
+Used only when local generation is enabled and available.
+
+## Setup Paths
+
+## Full bootstrap
 
 ```bash
-chmod +x setup_all.sh run_progeny.sh
+chmod +x setup_all.sh
+./setup_all.sh
 ```
+
+## Focused scripts
+
+- `./setup_tutor.sh`
+- `./setup_services.sh`
+- `./setup_postgres_bare_metal.sh`
 
 ## Run
 
 ```bash
-./run_progeny.sh
+PROGENY_FORCE_LOCAL=0 ./run_progeny.sh
 ```
 
-This starts Redis/SearXNG/Firecrawl, launches `ai-companion/app.py`, then opens Godot (`Bitling`).
+Mode toggles:
 
-## Generation Mode Controls
+- `PROGENY_FORCE_LOCAL=0` => force remote generation.
+- `PROGENY_FORCE_LOCAL=1` => prefer local generation when local SD API is reachable.
 
-- Remote-first (recommended on low-power dev laptop):
-  - `PROGENY_FORCE_LOCAL=0 ./run_progeny.sh`
-- Local-only when local SD API is reachable:
-  - `PROGENY_FORCE_LOCAL=1 ./run_progeny.sh`
+`run_progeny.sh` starts Redis/SearXNG/Firecrawl, then brain + Godot.
 
-## Creator + LoRAs
+## Core Ports
 
-1. Open Creator.
-2. Enter description and select style/model.
-3. Click `Browse LoRAs` and pick entries.
-4. Click `Generate` / `Regenerate`.
+- Brain WebSocket: `9001`
+- Audio HTTP server: `8000`
+- Writing pad Flask: `5000`
+- SearXNG: local app default in `searxng_server`
+- Firecrawl API: service-managed (see app config/start logs)
 
-LoRA field formats:
+## Open Brain Logging (Auto)
 
-- `name:weight`
-- `name|id:weight` (preferred; added automatically from catalog)
+Memory schema and logging hooks are in `ai-companion/services/memory_service.py` and used from `ai-companion/app.py`.
 
-Weight range is clamped to `0.0..2.0`.
+Auto-logged during runtime loop:
 
-## Overlay Interaction Features
+- state transitions
+- perception snapshots
+- interaction responses
+- struggle detections
+- XP events
+- knowledge updates
 
-- Drag-to-move avatar
-- Right-click context menu (`Talk`, `Regenerate Avatar`, `Pin/Unpin click-through`, `Hide Chat`, `Quit`)
-- Mini chat panel
-- Click-through pin mode
+## STT Recommendation (Target Machine)
 
-## STT Path For Target Machine
+Recommended local STT stack:
 
-Recommended local STT stack for your eventual stronger host:
+- `whisper.cpp` + Distil-Whisper Large v3 (or quantized medium/large variant)
 
-- `whisper.cpp` + Distil-Whisper Large v3 (or quantized Medium/Large variant)
-
-This gives better quality/stability than Vosk while staying lighter than full Whisper Python runtime.
+Rationale: good quality/latency/resource balance compared with heavier full Whisper Python runtime.
