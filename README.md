@@ -1,127 +1,131 @@
 # Progeny (Bitling)
 
-An AI learning companion built for real kids in real homes, not a demo.
+Progeny is an AI learning companion built for real kids, real families, and real everyday struggles.
 
-## Why This Exists
+## Our Mission
 
-As AI becomes more relevant to education, kids are increasingly learning *with* AI, not just from static apps.  
-Progeny was created to make that useful, safe, and human-centered.
+Kids are growing up in a world where AI is part of learning whether we like it or not.
+The question is not "should AI exist in education".
+The real question is:
 
-Most children’s apps are either:
+- can AI help children feel capable,
+- can it support curiosity without pressure,
+- can it meet neurodivergent kids where they are instead of forcing them into a rigid mold?
 
-- generic drill tools with no personalization, or
-- “AI toys” that are flashy but not built around real developmental needs.
+Progeny exists to answer yes.
 
-There are also almost no systems designed specifically for neurodivergent learners while still working for all kids.
+This is not meant to be another app that drills kids, scores them, and calls it learning.
+It is meant to be a supportive companion that helps a child keep going, especially when learning gets hard.
 
-Progeny’s purpose:
+## What We Care About
 
-- help children learn faster by linking new skills to their actual interests,
-- support neurodivergent learning needs (Autism/ADHD/AuDHD),
-- give parents practical visibility into effort, struggles, and progress,
-- stay local-first so families keep control of their child’s data and workflow.
+- Interest-first learning: start from what the child already loves.
+- Regulated persistence over perfect correctness.
+- Tiny wins, low pressure, and steady growth.
+- Parent visibility without shaming or clinical coldness.
+- Neurodivergent-aware support that adapts in real time.
 
 ## Who This Is For
 
-- Children who learn better through interaction and character-based guidance.
-- Parents who want to scaffold learning at home without guesswork.
-- Neurodivergent families needing adaptable sensory/communication support.
-- Builders/educators who want a customizable local tutor stack.
+- Children who learn best through interaction, play, and visual companionship.
+- Parents who want support tools, not judgment tools.
+- Neurodivergent families (Autism/ADHD/AuDHD) who need adaptable pacing and communication.
+- Builders/educators who want a local-first, modifiable tutor stack.
 
-## Design Principles
+## How Progeny Is Meant To Feel
 
-- Interest-first: connect lessons to what the child already cares about.
-- Scaffold, don’t overwhelm: small wins, clear feedback, repeatable routine.
-- Local-first by default: keep core data and behaviors on-device.
-- Parent visibility: progress and friction should be observable, not hidden.
-- Practical over hype: if it doesn’t improve daily learning, it doesn’t ship.
+For a child:
 
-## What Progeny Is
+- "Bitling gets me."
+- "I can try again without being pushed too hard."
+- "Learning feels like building something together."
 
-Local-first tutor companion stack:
+For a parent:
 
-- `Bitling/` = Godot 4 client (character creator + overlay companion)
-- `ai-companion/` = Python brain (WebSocket orchestration + memory + safety + TTS + writing server)
-- `services/` = supporting local infrastructure (SearXNG, Firecrawl, Kokoro assets, optional local generator)
+- "I can see what helps my child, what stresses them, and what restores them."
+- "This supports my child’s growth without turning home into a testing center."
 
-## Core Product Features
+## Product Experience
 
-## 1) Tutor Avatar Creator (Godot)
+## 1) Create A Companion
 
-- Create/regenerate/tweak a tutor avatar from natural language.
-- Remote generation path (AI Horde/ArtBot style) for weaker dev hardware.
-- LoRA browsing/selection flow with runnable payload mapping.
-- Output preview is stored in `Bitling/assets/generated/`.
+The child/family creates Bitling’s avatar and style in Godot.
+This gives ownership and emotional buy-in from day one.
 
-## 2) Desktop Companion Overlay
+## 2) First Meeting (Onboarding)
 
-- Borderless transparent “clippy-style” always-on-top companion.
-- Drag/move, context menu, chat panel, click-through pin mode.
-- Reacts to backend action/speak events.
+The first session is designed as a relationship-building flow, not an assessment.
 
-## 3) Open Brain Memory System
+- Parent can optionally provide baseline context.
+- Child goes through playful world-building prompts.
+- Signals are collected quietly (latency, writing pressure, pauses, retries, etc.).
+- The system builds an adaptive baseline from behavior patterns, not labels.
 
-PostgreSQL + pgvector-backed long-term memory:
+## 3) Live Neuroadaptive Teaching
 
-- events
-- semantic knowledge
-- lessons
-- struggles
-- XP ledger + level progression
-- graph nodes/edges for related concepts
+Bitling continuously adapts to the child’s *current* state.
+It does not only ask "what topic?" — it asks "what is this child ready for right now?"
 
-Open Brain connection status is sent in WS init and surfaced in Godot UI.
+Teaching modes:
 
-## 4) Writing Pad / Tablet Server (Important)
+- `advance`
+- `stabilize`
+- `repair`
+- `recover`
 
-This is already in the stack and runs as a Flask app on port `5000`.
+So when overload rises, Bitling reduces demand instead of pushing harder.
 
-- Writing canvas endpoint: `/`
-- Parent dashboard endpoint: `/dashboard`
-- API:
-  - `/api/submit_writing`
-  - `/api/struggles`
-  - `/api/graph_stats`
+## 4) Dynamic Lessons
 
-Writing flow captures stroke pressure and logs:
+Lessons are generated live from:
 
-- effort XP
-- mastery XP when regulation is good
-- struggle events when pressure is too heavy/light
+- child interests,
+- recent behavior,
+- current adaptive state,
+- prior struggles and what helped recovery.
 
-This is intended for stylus/tablet writing and fine-motor support.
+The content is dynamic, but internally structured so the app stays reliable.
 
-## 5) Speech Pipeline
+## 5) Writing + Fine-Motor Support
 
-- Kokoro ONNX TTS primary.
-- Cached audio for repeated phrases (`ai-companion/data/tts_cache/*.wav`).
-- Lightweight post-processing for cleaner speech.
-- Optional Piper fallback when configured.
+The writing pad/tablet server lets kids draw/write in a low-pressure way.
+It tracks pressure/motor patterns and turns those into support signals.
 
-## Current Status
+This helps detect not just "can they do it," but "what made it harder" and "what helped them recover."
 
-### Working now
+## 6) Media + Attention Loop
 
-- Godot <-> brain WebSocket connection and init payload.
-- Creator remote generation request path.
-- LoRA browse + selection flow.
-- Generated image save/load pathing.
-- Overlay companion scene and interaction controls.
-- Open Brain status handshake (`connected` + detail).
-- Writing Pad server endpoints and persistence hooks.
-- Memory logging hooks (state/perception/interaction/struggle/XP/knowledge).
-- Kokoro TTS generation + local audio serving.
+Watching content is optional, but tracked as an attention/comprehension signal.
+Short post-watch probes (choice/drawing/co-play prompts) help estimate:
 
-### Known constraints
+- comprehension,
+- retention,
+- regulation effect,
+- whether that kind of media helps this specific child.
 
-- If PostgreSQL/pgvector is unavailable, Open Brain logging fails.
-- If Firecrawl/SearXNG is down, research quality drops.
-- Piper fallback only runs when `PROGENY_PIPER_MODEL` is set.
-- Local SD path needs Automatic1111 API + capable hardware.
+## What’s Working Right Now
 
-## Dependencies (Actual)
+- Creator + avatar generation flow
+- Onboarding scene in Godot
+- Adaptive profile persistence and live updates
+- Dynamic lesson generation with adaptive context
+- Writing telemetry feeding adaptation
+- Optional media session/probe tracking
+- Open Brain memory persistence (Postgres + pgvector)
+- Kokoro speech with caching and fallback support
 
-## 1) System packages (Ubuntu/Pop)
+## Tech Stack (Short Version)
+
+- Godot client (`Bitling/`)
+- Python brain (`ai-companion/`)
+- Postgres + pgvector memory
+- SearXNG + Firecrawl research pipeline
+- Ollama local models
+- Kokoro ONNX speech
+
+## Dependencies
+
+System packages (Ubuntu/Pop):
 
 ```bash
 sudo apt update
@@ -134,13 +138,7 @@ sudo apt install -y \
   git-lfs espeak-ng
 ```
 
-Also required:
-
-- Godot 4.x (project currently run/tested with 4.3 in logs)
-- Ollama
-- PostgreSQL + pgvector extension
-
-## 2) Python dependencies (`ai-companion`)
+Python setup:
 
 ```bash
 python3 -m venv ai-companion/venv
@@ -149,223 +147,44 @@ pip install --upgrade pip
 pip install -r ai-companion/requirements.txt
 ```
 
-Current required packages:
-
-- `requests`
-- `pyyaml`
-- `websockets`
-- `flask`
-- `transitions`
-- `psutil`
-- `opencv-python`
-- `numpy`
-- `ollama`
-- `fastembed`
-- `pydantic`
-- `json-repair`
-- `kokoro-onnx`
-- `soundfile`
-- `pychromecast<14.0.0`
-- `psycopg2-binary`
-- `pgvector`
-
-## 3) Node/PNPM (Firecrawl)
+Node/PNPM (Firecrawl):
 
 ```bash
-curl -fsSL https://get.pnpm.io/install.sh | sh -
+curl -fsSL https://get.pnpm.io/install.sh | sh
 export PATH="$HOME/.local/share/pnpm:$PATH"
 ```
 
-Then install Firecrawl deps inside `services/firecrawl` with `pnpm install`.
+Also required:
 
-## 4) Required runtime services
-
-- Redis
+- Godot 4.x
+- Ollama (`moondream`, `qwen2.5:0.5b`)
 - PostgreSQL + pgvector
-- SearXNG (`ai-companion/searxng_server`)
-- Firecrawl API (`services/firecrawl/apps/api`)
-- Ollama models:
-  - `moondream`
-  - `qwen2.5:0.5b`
+- Redis
+- SearXNG
+- Firecrawl API
 
-## 5) Optional extras
+Optional:
 
-- Automatic1111 local SD API (`http://127.0.0.1:7860`)
-- Piper fallback:
-  - `PROGENY_PIPER_MODEL=/absolute/path/to/model.onnx`
-  - optional `PROGENY_PIPER_BIN=piper`
+- Automatic1111 local SD API
+- Piper fallback (`PROGENY_PIPER_MODEL`, `PROGENY_PIPER_BIN`)
 
-## Setup
+## Setup & Run
 
-## Full bootstrap
+Setup:
 
 ```bash
 chmod +x setup_all.sh
 ./setup_all.sh
 ```
 
-## Focused scripts
-
-- `./setup_tutor.sh`
-- `./setup_services.sh`
-- `./setup_postgres_bare_metal.sh`
-
-## Run
+Run:
 
 ```bash
 PROGENY_FORCE_LOCAL=0 ./run_progeny.sh
 ```
-
-Mode toggles:
-
-- `PROGENY_FORCE_LOCAL=0` -> force remote generation.
-- `PROGENY_FORCE_LOCAL=1` -> prefer local generation when local SD API is reachable.
-
-## Ports
-
-- Brain WebSocket: `9001`
-- Audio HTTP server: `8000`
-- Writing Pad Flask: `5000`
 
 ## STT Direction (Target Machine)
 
 Recommended local STT path:
 
 - `whisper.cpp` + Distil-Whisper Large v3 (or quantized medium/large variant)
-
-## New: Neuroadaptive Onboarding + Live Teaching Engine
-
-This stack now includes a trait + state + micro-signal adaptation system.
-
-How it works:
-
-1. Trait Layer (slow-changing baseline)
-- Parent baseline is captured and mapped into a multidimensional profile (not a diagnosis preset).
-- Stored in Open Brain `adaptation_profile`.
-
-2. Session State Layer (updates every loop)
-- Inferred dimensions:
-  - engagement
-  - cognitive_load
-  - frustration
-  - regulation
-  - confidence
-  - challenge_readiness
-
-3. Micro-Signal Layer (fast events)
-- Feeds state inference from onboarding events + writing telemetry:
-  - pressure variance
-  - pressure spike frequency
-  - micro pauses
-  - fragmentation
-  - engagement duration
-
-4. Teaching Mode Policy (live control)
-- System selects one mode each cycle:
-  - `advance`
-  - `stabilize`
-  - `repair`
-  - `recover`
-- Mode drives prompt style, demand level, modality, and pacing.
-
-## New: Godot Onboarding UI
-
-The Godot flow now routes:
-
-`Creator -> Onboarding -> Main`
-
-Added files:
-
-- `Bitling/Onboarding.tscn`
-- `Bitling/Onboarding.gd`
-
-Current onboarding UI includes:
-
-- Parent baseline capture (optional)
-- Child world-building session prompt flow
-- Metric events sent to backend over WS
-- Parent-facing session summary + starter plan
-
-## New: Dynamic Structured Lessons (Not Static Lessons)
-
-Lessons are generated dynamically from live state, but emitted in a strict schema for deterministic rendering.
-
-Lesson schema fields:
-
-- `hook`
-- `facts` (exactly 3)
-- `activity`
-- `media_followup`
-- `adaptation_note`
-- `next_probe`
-- `mode`
-
-Why this design:
-
-- Dynamic generation keeps retention optimized to current state.
-- Structured output prevents brittle UI/runtime behavior.
-
-Backend now broadcasts `lesson_plan` packets with this schema so Godot can render sections consistently.
-
-## New: Media + Attention Loop (Optional, Tracked)
-
-Media tracking is now wired so watched content can be evaluated against behavior/comprehension.
-
-Database additions:
-
-- `media_sessions`
-- `media_probes`
-
-What is tracked:
-
-- session metadata (`topic/title/url/start/end/watched_seconds/completed`)
-- baseline vs end adaptive state
-- behavior delta (`engagement/frustration/regulation`)
-- post-watch probe events (`probe_type/response_mode/latency/success_score`)
-
-This powers per-topic `media_effectiveness` and is fed back into lesson planning prompts.
-
-## New WebSocket Messages
-
-Onboarding + adaptation:
-
-- `get_onboarding_script`
-- `set_parent_baseline`
-- `onboarding_event`
-- `finish_onboarding`
-- `adaptive_state` (broadcast)
-
-Media loop:
-
-- `start_media_session`
-- `media_probe_event`
-- `end_media_session`
-- `get_media_insights`
-- `get_media_probe_pack`
-
-Lesson output:
-
-- `lesson_plan` (broadcast with structured lesson object)
-
-## New HTTP Endpoints (Writing/Tablet Server)
-
-Onboarding:
-
-- `POST /api/onboarding/baseline`
-
-Media tracking:
-
-- `POST /api/media/start`
-- `POST /api/media/probe`
-- `POST /api/media/end`
-- `GET /api/media/insights`
-
-Writing endpoint now also returns adaptation context:
-
-- `POST /api/submit_writing` -> includes `metrics` + `adaptation_profile`
-
-## Operational Notes
-
-- If Postgres is down, adaptive profile/media/session persistence will fail.
-- Godot headless check can crash on some hosts; validate scene flow with normal runtime when needed.
-- Media probes are intentionally optional and low-pressure; they should never block lesson flow.
