@@ -74,6 +74,26 @@ layout_mode = 2
 autowrap_mode = 3
 text = "Parent Baseline (Optional): help Bitling meet your child where they are."
 
+[node name="WarmupTrack" type="HBoxContainer" parent="Root/TabContainer/Parent/ParentVBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Dot1" type="ColorRect" parent="Root/TabContainer/Parent/ParentVBox/WarmupTrack"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+color = Color(0.25, 0.28, 0.31, 1)
+
+[node name="Dot2" type="ColorRect" parent="Root/TabContainer/Parent/ParentVBox/WarmupTrack"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+color = Color(0.25, 0.28, 0.31, 1)
+
+[node name="Dot3" type="ColorRect" parent="Root/TabContainer/Parent/ParentVBox/WarmupTrack"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+color = Color(0.25, 0.28, 0.31, 1)
+
 [node name="Grid" type="GridContainer" parent="Root/TabContainer/Parent/ParentVBox"]
 layout_mode = 2
 columns = 2

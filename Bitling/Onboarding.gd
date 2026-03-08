@@ -22,6 +22,10 @@ var warmup_info := {"enabled": false, "active": false, "current_run": 1, "comple
 @onready var go_main_button = $Root/TabContainer/Parent/ParentVBox/ParentButtons/GoMainButton
 @onready var parent_summary = $Root/TabContainer/Parent/ParentVBox/Summary
 @onready var warmup_toggle = $Root/TabContainer/Parent/ParentVBox/WarmupToggle
+@onready var warmup_track = $Root/TabContainer/Parent/ParentVBox/WarmupTrack
+@onready var warmup_dot_1 = $Root/TabContainer/Parent/ParentVBox/WarmupTrack/Dot1
+@onready var warmup_dot_2 = $Root/TabContainer/Parent/ParentVBox/WarmupTrack/Dot2
+@onready var warmup_dot_3 = $Root/TabContainer/Parent/ParentVBox/WarmupTrack/Dot3
 
 @onready var age_spin = $Root/TabContainer/Parent/ParentVBox/Grid/AgeSpin
 @onready var comm_mode = $Root/TabContainer/Parent/ParentVBox/Grid/CommMode
@@ -298,12 +302,30 @@ func _set_session_id_for_run():
 func _update_warmup_hint():
 	if not begin_child_button:
 		return
+	_render_warmup_dots()
 	var enabled = bool(warmup_info.get("enabled", false))
-	var active = bool(warmup_info.get("active", false))
-	var run_idx = int(warmup_info.get("current_run", 1))
-	var total = int(warmup_info.get("total_runs", 3))
-	if enabled and active:
-		begin_child_button.text = "Begin Warm-up Run %d/%d" % [run_idx, total]
-		child_hint.text = "Warm-up mode: same short flow, three independent runs, increasing engagement each run."
-	else:
-		begin_child_button.text = "Begin Child Session"
+	begin_child_button.text = "Begin Child Session"
+	if enabled:
+		child_hint.text = "Use low-pressure language. This should feel like co-play, not a test."
+
+func _render_warmup_dots():
+	if not warmup_track:
+		return
+	var enabled = bool(warmup_info.get("enabled", false))
+	warmup_track.visible = enabled
+	if not enabled:
+		return
+	var completed = int(warmup_info.get("completed_runs", 0))
+	var current_run = int(warmup_info.get("current_run", 1))
+	var dots = [warmup_dot_1, warmup_dot_2, warmup_dot_3]
+	for i in range(3):
+		var dot = dots[i]
+		if not dot:
+			continue
+		var run_num = i + 1
+		if run_num <= completed:
+			dot.color = Color(0.28, 0.55, 0.42, 1.0) # completed
+		elif run_num == current_run:
+			dot.color = Color(0.35, 0.44, 0.62, 1.0) # current
+		else:
+			dot.color = Color(0.25, 0.28, 0.31, 1.0) # pending
