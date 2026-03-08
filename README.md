@@ -232,3 +232,140 @@ Mode toggles:
 Recommended local STT path:
 
 - `whisper.cpp` + Distil-Whisper Large v3 (or quantized medium/large variant)
+
+## New: Neuroadaptive Onboarding + Live Teaching Engine
+
+This stack now includes a trait + state + micro-signal adaptation system.
+
+How it works:
+
+1. Trait Layer (slow-changing baseline)
+- Parent baseline is captured and mapped into a multidimensional profile (not a diagnosis preset).
+- Stored in Open Brain `adaptation_profile`.
+
+2. Session State Layer (updates every loop)
+- Inferred dimensions:
+  - engagement
+  - cognitive_load
+  - frustration
+  - regulation
+  - confidence
+  - challenge_readiness
+
+3. Micro-Signal Layer (fast events)
+- Feeds state inference from onboarding events + writing telemetry:
+  - pressure variance
+  - pressure spike frequency
+  - micro pauses
+  - fragmentation
+  - engagement duration
+
+4. Teaching Mode Policy (live control)
+- System selects one mode each cycle:
+  - `advance`
+  - `stabilize`
+  - `repair`
+  - `recover`
+- Mode drives prompt style, demand level, modality, and pacing.
+
+## New: Godot Onboarding UI
+
+The Godot flow now routes:
+
+`Creator -> Onboarding -> Main`
+
+Added files:
+
+- `Bitling/Onboarding.tscn`
+- `Bitling/Onboarding.gd`
+
+Current onboarding UI includes:
+
+- Parent baseline capture (optional)
+- Child world-building session prompt flow
+- Metric events sent to backend over WS
+- Parent-facing session summary + starter plan
+
+## New: Dynamic Structured Lessons (Not Static Lessons)
+
+Lessons are generated dynamically from live state, but emitted in a strict schema for deterministic rendering.
+
+Lesson schema fields:
+
+- `hook`
+- `facts` (exactly 3)
+- `activity`
+- `media_followup`
+- `adaptation_note`
+- `next_probe`
+- `mode`
+
+Why this design:
+
+- Dynamic generation keeps retention optimized to current state.
+- Structured output prevents brittle UI/runtime behavior.
+
+Backend now broadcasts `lesson_plan` packets with this schema so Godot can render sections consistently.
+
+## New: Media + Attention Loop (Optional, Tracked)
+
+Media tracking is now wired so watched content can be evaluated against behavior/comprehension.
+
+Database additions:
+
+- `media_sessions`
+- `media_probes`
+
+What is tracked:
+
+- session metadata (`topic/title/url/start/end/watched_seconds/completed`)
+- baseline vs end adaptive state
+- behavior delta (`engagement/frustration/regulation`)
+- post-watch probe events (`probe_type/response_mode/latency/success_score`)
+
+This powers per-topic `media_effectiveness` and is fed back into lesson planning prompts.
+
+## New WebSocket Messages
+
+Onboarding + adaptation:
+
+- `get_onboarding_script`
+- `set_parent_baseline`
+- `onboarding_event`
+- `finish_onboarding`
+- `adaptive_state` (broadcast)
+
+Media loop:
+
+- `start_media_session`
+- `media_probe_event`
+- `end_media_session`
+- `get_media_insights`
+- `get_media_probe_pack`
+
+Lesson output:
+
+- `lesson_plan` (broadcast with structured lesson object)
+
+## New HTTP Endpoints (Writing/Tablet Server)
+
+Onboarding:
+
+- `POST /api/onboarding/baseline`
+
+Media tracking:
+
+- `POST /api/media/start`
+- `POST /api/media/probe`
+- `POST /api/media/end`
+- `GET /api/media/insights`
+
+Writing endpoint now also returns adaptation context:
+
+- `POST /api/submit_writing` -> includes `metrics` + `adaptation_profile`
+
+## Operational Notes
+
+- If Postgres is down, adaptive profile/media/session persistence will fail.
+- Godot headless check can crash on some hosts; validate scene flow with normal runtime when needed.
+- Media probes are intentionally optional and low-pressure; they should never block lesson flow.
