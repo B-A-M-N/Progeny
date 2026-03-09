@@ -44,12 +44,41 @@ class FirecrawlService:
             print(f"Firecrawl connection error: {e}")
         return None
 
+    def search_integrated(self, query, search_service, limit=3):
+        """
+        1. Uses SearXNG to find the best URLs (more reliable local search).
+        2. Uses Firecrawl to scrape and turn them into clean Markdown.
+        """
+        print(f"[FirecrawlService] Starting integrated search for: {query}")
+        search_results = search_service.search(query)
+        
+        if not search_results or 'results' not in search_results:
+            print("[FirecrawlService] SearXNG returned no results.")
+            return []
+
+        scraped_data = []
+        # Take the top URLs from SearXNG
+        urls = [res['url'] for res in search_results['results'][:limit]]
+        
+        for url in urls:
+            print(f"[FirecrawlService] Deep scraping: {url}")
+            data = self.scrape_url(url)
+            if data and data.get('success'):
+                scraped_data.append({
+                    "url": url,
+                    "markdown": data.get('data', {}).get('markdown', ''),
+                    "title": data.get('data', {}).get('metadata', {}).get('title', 'Unknown')
+                })
+        
+        return scraped_data
+
 if __name__ == "__main__":
+    from search_service import SearchService
+    search_service = SearchService()
+    # Assume SearXNG is already running or start it here for testing
     fc = FirecrawlService()
-    print("Testing Firecrawl search for 'trains for kids'...")
-    results = fc.search("best trains for kids learning")
-    if results and results.get('success'):
-        for res in results.get('data', [])[:2]:
-            print(f"- {res.get('url')} (Content length: {len(res.get('markdown', ''))})")
-    else:
-        print("Search failed or returned no results.")
+    print("Testing Integrated Search...")
+    # This requires SearXNG to be active on 8080
+    results = fc.search_integrated("best educational trains for kids", search_service)
+    for res in results:
+        print(f"FOUND: {res['title']} - {len(res['markdown'])} chars")

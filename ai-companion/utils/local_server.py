@@ -35,6 +35,8 @@ class LocalAudioServer:
         # We use partial to pass this argument when the server instantiates the handler.
         handler_factory = partial(http.server.SimpleHTTPRequestHandler, directory=self.directory)
 
+        # Allow address reuse to prevent hanging if port is in TIME_WAIT
+        socketserver.TCPServer.allow_reuse_address = True
         self.httpd = socketserver.TCPServer(("", self.port), handler_factory)
         self.thread = threading.Thread(target=self.httpd.serve_forever)
         self.thread.daemon = True

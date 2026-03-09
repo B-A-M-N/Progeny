@@ -2,6 +2,8 @@ system:
   ip_address: "0.0.0.0"
   port: 8000
   loop_interval_seconds: 5
+  max_cpu_percent: 85
+  max_ram_percent: 90
 
 hardware:
   gpu_vram_gb: 4
@@ -24,23 +26,72 @@ child:
     - "dinosaurs"
     - "cars"
     - "building"
+  
+  # Advanced Neurodiversity Profile (Multi-Dimensional Spectrum)
+  neurodiversity_profile:
+    # 1. Sensory Processing
+    sensory:
+      visual_sensitivity: "low" # low (seeking) | medium | high (avoidant)
+      auditory_sensitivity: "medium"
+      preferred_visual_vibe: "calm" # calm (low arousal) | energetic (high contrast)
+    
+    # 2. Communication Style
+    communication:
+      processing_type: "gestalt" # gestalt (whole chunks/echolalia) | analytic (word by word)
+      style: "declarative" # declarative (modeling) | interrogative (questioning)
+      literalness: "high" # high (avoid metaphors/idioms) | medium | low
+    
+    # 3. Social & Emotional
+    engagement:
+      interaction_frequency: "medium" # low (patient) | medium | high (proactive)
+      celebration_style: "parallel" # parallel (joining in) | direct (praise)
+      routine_strictness: "high" # high (prefers clear transitions) | low
+
+    # 4. Executive Function & Focus (ADHD/AuDHD Support)
+    executive_function:
+      is_adhd: true
+      is_audhd: true # Autism + ADHD
+      focus_scaffolding: "micro_tasking" # micro_tasking | broad_guidance
+      dopamine_optimized: true # Prioritize high-interest hooks and frequent small wins
+      body_doubling_mode: true # Bitling stays active/visible to provide 'presence' support
+      time_awareness: "visual_countdown" # visual_countdown | gentle_nudge
 
 parent_controls:
   max_speech_per_minute: 4
-  blocked_topics:
-    - "scary"
-    - "violence"
-    - "death"
-    - "news"
-  teaching_goals:
-    - "counting"
-    - "colors"
-    - "turn-taking"
-    - "emotion labeling"
-  calming_strategies:
-    - "breathing"
-    - "music"
-    - "familiar phrases"
+  # ... (existing entries)
+
+generation:
+  prefer_local: false  # SET TO FALSE (No GPU on this machine)
+  local_api_url: "http://127.0.0.1:7860"
+  horde_api_key: "0000000000"
+  style_preset: "pixel_art"
+  # Local LoRA Support (Only used if prefer_local is true)
+  loras:
+    - name: "pixar_style_sdxl"
+      weight: 0.8
+      trigger_word: "pixar style"
+    - name: "ghibli_style_sdxl"
+      weight: 0.7
+      trigger_word: "ghibli style"
+    - name: "watercolor_style_sdxl"
+      weight: 0.8
+      trigger_word: "watercolor style"
+    - name: "claymation_style_sdxl"
+      weight: 0.9
+      trigger_word: "claymation style"
+    - name: "lego_style_sdxl"
+      weight: 0.8
+      trigger_word: "lego style"
+    - name: "amigurumi_style_sdxl"
+      weight: 0.8
+      trigger_word: "Amigurami, Crochet"
+    - name: "crayon_style_sdxl"
+      weight: 0.8
+      trigger_word: "crayon drawing"
+    - name: "disney_style_ponyxl"
+      weight: 0.7
+      trigger_word: "3d animation, disney"
+      note: "!!! REQUIRES PONYXL BASE MODEL !!!" # Standard SDXL will not work well with this LoRA
 
 # The agent will only choose from these approved actions
 allowed_actions:

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bitling Writing Pad</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8; /* Soft blue-grey for sensory calm */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #header {
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #pad-container {
+            position: relative;
+            width: 100vw;
+            height: calc(100vh - 120px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            cursor: crosshair;
+        }
+        #controls {
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            background: #fff;
+        }
+        button {
+            padding: 10px 25px;
+            font-size: 18px;
+            border: none;
+            border-radius: 25px;
+            background: #4a90e2;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        button.clear { background: #e74c3c; }
+        button.submit { background: #2ecc71; }
+        
+        #pressure-meter {
+            position: fixed;
+            right: 20px;
+            top: 80px;
+            width: 20px;
+            height: 200px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #pressure-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #2ecc71, #f1c40f, #e74c3c);
+            transition: height 0.05s;
+        }
+        #status-msg {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <div style="font-size: 20px; font-weight: bold; color: #34495e;">Writing with Bitling</div>
+        <div id="status-msg">Connecting...</div>
+    </div>
+
+    <div id="pressure-meter">
+        <div id="pressure-fill"></div>
+    </div>
+
+    <div id="pad-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="controls">
+        <button class="clear" onclick="clearCanvas()">Clear</button>
+        <button class="submit" onclick="submitDrawing()">Done!</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const pressureFill = document.getElementById('pressure-fill');
+        const statusMsg = document.getElementById('status-msg');
+        
+        let drawing = false;
+        let strokeData = [];
+        let currentStroke = [];
+
+        function resize() {
+            canvas.width = window.innerWidth * 0.9;
+            canvas.height = window.innerHeight * 0.7;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Pointer Events for Pressure Support
+        canvas.addEventListener('pointerdown', (e) => {
+            drawing = true;
+            currentStroke = [];
+            addPoint(e);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!drawing) return;
+            addPoint(e);
+            draw(e);
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            if (!drawing) return;
+            drawing = false;
+            strokeData.push(currentStroke);
+            updatePressureMeter(0);
+        });
+
+        canvas.addEventListener('pointercancel', () => drawing = false);
+
+        function addPoint(e) {
+            const rect = canvas.getBoundingClientRect();
+            const point = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                p: e.pressure || 0.5, // Fallback if pressure not supported
+                t: Date.now()
+            };
+            currentStroke.push(point);
+            updatePressureMeter(point.p);
+        }
+
+        function updatePressureMeter(p) {
+            pressureFill.style.height = (p * 100) + '%';
+        }
+
+        function draw(e) {
+            if (currentStroke.length < 2) return;
+            
+            const p1 = currentStroke[currentStroke.length - 2];
+            const p2 = currentStroke[currentStroke.length - 1];
+            
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            
+            // Visualizing pressure: Change thickness
+            ctx.lineWidth = 2 + (p2.p * 15);
+            // Change color based on pressure (Green = Good, Red = Too Heavy)
+            if (p2.p > 0.8) ctx.strokeStyle = '#e74c3c';
+            else if (p2.p < 0.2) ctx.strokeStyle = '#3498db';
+            else ctx.strokeStyle = '#2c3e50';
+            
+            ctx.stroke();
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            strokeData = [];
+            statusMsg.innerText = "Cleared";
+        }
+
+        async function submitDrawing() {
+            statusMsg.innerText = "Saving...";
+            const imageData = canvas.toDataURL('image/png');
+            
+            try {
+                const response = await fetch('/api/submit_writing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: imageData,
+                        strokes: strokeData
+                    })
+                });
+                const result = await response.json();
+                statusMsg.innerText = result.message || "Saved!";
+                setTimeout(clearCanvas, 1000);
+            } catch (err) {
+                console.error(err);
+                statusMsg.innerText = "Error saving";
+            }
+        }
+
+        statusMsg.innerText = "Ready to write!";
+    </script>
+</body>
+</html>

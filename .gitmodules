@@ -1,0 +1,3 @@
+[submodule "services/firecrawl"]
+	path = services/firecrawl
+	url = https://github.com/B-A-M-N/firecrawl-local

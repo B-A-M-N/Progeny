@@ -2,6 +2,28 @@ import json
 import os
 import time
 import ollama
+from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
+from utils.json_enforcer import JsonEnforcer, fuzzy_enum_match
+
+class VisionState(BaseModel):
+    child_present: bool = False
+    visible_objects: List[str] = Field(default_factory=list)
+    engagement_level: str = "none"
+    emotion: str = "calm"
+    activity: str = "idle"
+    current_interest: str = "unknown"
+    struggles_detected: List[str] = Field(default_factory=list)
+
+    @field_validator("engagement_level")
+    @classmethod
+    def validate_engagement(cls, v):
+        return fuzzy_enum_match(v, ["high", "medium", "low", "none"], "none")
+
+    @field_validator("emotion")
+    @classmethod
+    def validate_emotion(cls, v):
+        return fuzzy_enum_match(v, ["happy", "sad", "frustrated", "excited", "calm", "bored"], "calm")
 
 class StateService:
     def __init__(self, history_file="data/session_state.json", model="qwen2.5:0.5b"):
@@ -42,17 +64,14 @@ class StateService:
         # Use a tiny LLM to extract structured state from the vision description
         # This keeps the logic robust while staying local and fast
         prompt = (
-            f"Based on this vision description: '{vision_description}'\n"
-            "Extract the following JSON state:\n"
-            "{\n"
-            "  \"child_present\": boolean,\n"
-            "  \"visible_objects\": [string],\n"
-            "  \"engagement_level\": \"high\"|\"medium\"|\"low\"|\"none\",\n"
-            "  \"emotion\": \"happy\"|\"sad\"|\"frustrated\"|\"excited\"|\"calm\"|\"bored\",\n"
-            "  \"activity\": string,\n"
-            "  \"current_interest\": string,\n"
-            "  \"struggles_detected\": [string] -- list of any difficulties like 'motor skills', 'counting', 'frustration'\n"
-            "}\n"
+            "SYSTEM: You are a structural state extractor. You convert vision descriptions into JSON.\n"
+            "EXAMPLE 1:\n"
+            "Description: 'A child is laughing and holding a red toy train.'\n"
+            "JSON: {\"child_present\": true, \"visible_objects\": [\"red toy train\"], \"engagement_level\": \"high\", \"emotion\": \"happy\", \"activity\": \"playing\", \"current_interest\": \"trains\", \"struggles_detected\": []}\n"
+            "EXAMPLE 2:\n"
+            "Description: 'The room is empty. A cat is on the sofa.'\n"
+            "JSON: {\"child_present\": false, \"visible_objects\": [\"cat\", \"sofa\"], \"engagement_level\": \"none\", \"emotion\": \"calm\", \"activity\": \"idle\", \"current_interest\": \"unknown\", \"struggles_detected\": []}\n"
+            f"NOW: Description: '{vision_description}'\n"
             "Return ONLY the raw JSON."
         )
 
@@ -63,11 +82,18 @@ class StateService:
                 format="json",
                 stream=False
             )
-            structured_data = json.loads(response['response'])
-            self.current_state.update(structured_data)
+            
+            # Use JsonEnforcer for "Bare Metal" reliability
+            structured_data = JsonEnforcer.enforce(
+                response['response'], 
+                VisionState,
+                default_factory=lambda: VisionState(child_present="child" in vision_description.lower())
+            )
+            
+            self.current_state.update(structured_data.model_dump())
         except Exception as e:
             print(f"State extraction error: {e}")
-            # Fallback to simple heuristic if LLM fails
+            # Fallback to simple heuristic if everything fails
             self.current_state["child_present"] = "child" in vision_description.lower()
 
         self.current_state["last_observation_time"] = time.time()

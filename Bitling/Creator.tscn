@@ -1,0 +1,227 @@
+[gd_scene load_steps=2 format=3 uid="uid://cx4x_creator"]
+
+[ext_resource type="Script" path="res://Creator.gd" id="1_creator"]
+
+[node name="Creator" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_creator")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.1, 0.15, 1)
+
+[node name="Workbench" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = 40.0
+offset_right = -40.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 50
+
+[node name="PreviewSection" type="VBoxContainer" parent="Workbench"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+
+[node name="PreviewArea" type="Control" parent="Workbench/PreviewSection"]
+custom_minimum_size = Vector2(800, 800)
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="PreviewFrame" type="Panel" parent="Workbench/PreviewSection/PreviewArea"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PreviewRect" type="TextureRect" parent="Workbench/PreviewSection/PreviewArea"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -380.0
+offset_top = -380.0
+offset_right = 380.0
+offset_bottom = 380.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CPUParticles2D" type="CPUParticles2D" parent="Workbench/PreviewSection/PreviewArea"]
+position = Vector2(400, 400)
+emitting = false
+amount = 100
+lifetime = 2.0
+emission_shape = 1
+emission_sphere_radius = 300.0
+gravity = Vector2(0, -80)
+scale_amount_min = 4.0
+scale_amount_max = 8.0
+color = Color(0.4, 0.8, 1, 1)
+
+[node name="ControlSection" type="VBoxContainer" parent="Workbench"]
+custom_minimum_size = Vector2(600, 0)
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Header" type="Label" parent="Workbench/ControlSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "BITLING WORKBENCH"
+horizontal_alignment = 1
+
+[node name="DemoLabel" type="Label" parent="Workbench/ControlSection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 22
+text = "Tell me... what should I look like?"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="EngineSettings" type="GridContainer" parent="Workbench/ControlSection"]
+layout_mode = 2
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 15
+columns = 2
+
+[node name="LabelModel" type="Label" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+text = "AI ENGINE:"
+
+[node name="ModelButton" type="OptionButton" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+size_flags_horizontal = 3
+item_count = 2
+selected = 0
+popup/item_0/text = "FLUX (Beautiful)"
+popup/item_0/id = 0
+popup/item_1/text = "TURBO (Instant)"
+popup/item_1/id = 1
+
+[node name="LabelEnhance" type="Label" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+text = "MAGIC POLISH:"
+
+[node name="EnhanceToggle" type="CheckButton" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+button_pressed = true
+text = "Auto-Improve Prompt"
+
+[node name="LabelSeed" type="Label" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+text = "SEED LOCK:"
+
+[node name="SeedToggle" type="CheckButton" parent="Workbench/ControlSection/EngineSettings"]
+layout_mode = 2
+text = "Keep Base Shape"
+
+[node name="HSeparator" type="HSeparator" parent="Workbench/ControlSection"]
+layout_mode = 2
+
+[node name="InputField" type="LineEdit" parent="Workbench/ControlSection"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+placeholder_text = "e.g. A friendly orange dinosaur"
+alignment = 1
+
+[node name="StyleButton" type="OptionButton" parent="Workbench/ControlSection"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+item_count = 5
+selected = 0
+popup/item_0/text = "3D Animated Movie"
+popup/item_0/id = 0
+popup/item_1/text = "Fuzzy Felted Wool"
+popup/item_1/id = 1
+popup/item_2/text = "Hand-Sculpted Clay"
+popup/item_2/id = 2
+popup/item_3/text = "Watercolor Storybook"
+popup/item_3/id = 3
+popup/item_4/text = "Retro Pixel Art"
+popup/item_4/id = 4
+
+[node name="LoraField" type="LineEdit" parent="Workbench/ControlSection"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+placeholder_text = "LoRAs (optional): name:0.8, another:0.6"
+
+[node name="LoraBrowseRow" type="HBoxContainer" parent="Workbench/ControlSection"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LoraSearchField" type="LineEdit" parent="Workbench/ControlSection/LoraBrowseRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search LoRAs (e.g. pixel, disney, watercolor)"
+
+[node name="LoraBrowseButton" type="Button" parent="Workbench/ControlSection/LoraBrowseRow"]
+layout_mode = 2
+text = "Browse LoRAs"
+
+[node name="LoraResults" type="ItemList" parent="Workbench/ControlSection"]
+custom_minimum_size = Vector2(0, 130)
+layout_mode = 2
+select_mode = 0
+
+[node name="TweakField" type="LineEdit" parent="Workbench/ControlSection"]
+visible = false
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 20
+placeholder_text = "Change a small detail?"
+alignment = 1
+
+[node name="ActionButtons" type="VBoxContainer" parent="Workbench/ControlSection"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="CreateButton" type="Button" parent="Workbench/ControlSection/ActionButtons"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Build My Tutor!"
+
+[node name="HBox" type="HBoxContainer" parent="Workbench/ControlSection/ActionButtons"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="RegenerateButton" type="Button" parent="Workbench/ControlSection/ActionButtons/HBox"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Regenerate"
+
+[node name="TweakButton" type="Button" parent="Workbench/ControlSection/ActionButtons/HBox"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Tweak Detail"
+
+[connection signal="pressed" from="Workbench/ControlSection/ActionButtons/CreateButton" to="." method="_on_create_button_pressed"]
+[connection signal="pressed" from="Workbench/ControlSection/ActionButtons/HBox/RegenerateButton" to="." method="_on_regenerate_button_pressed"]
+[connection signal="pressed" from="Workbench/ControlSection/ActionButtons/HBox/TweakButton" to="." method="_on_tweak_button_pressed"]

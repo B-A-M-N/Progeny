@@ -1,16 +1,17 @@
-from fastembed import TextEmbedding, TextReranker
+from fastembed import TextEmbedding, TextCrossEncoder
 import numpy as np
 
 class EmbeddingService:
-    def __init__(self, embed_model="BAAI/bge-small-en-v1.5", rerank_model="Xenova/bge-reranker-base"):
+    def __init__(self, embed_model="BAAI/bge-small-en-v1.5", rerank_model="jinaai/jina-reranker-v1-turbo-en"):
         print(f"[Embedding] Loading embedding model: {embed_model}")
         self.embedding_model = TextEmbedding(model_name=embed_model)
         
-        print(f"[Embedding] Loading rerank model: {rerank_model}")
+        print(f"[Embedding] Loading Turbo Reranker: {rerank_model}")
         try:
-            self.reranker = TextReranker(model_name=rerank_model)
+            # Use TextCrossEncoder for optimized CPU reranking
+            self.reranker = TextCrossEncoder(model_name=rerank_model)
         except Exception as e:
-            print(f"Warning: Reranker failed to load: {e}. Falling back to embedding similarity.")
+            print(f"Warning: Turbo Reranker failed to load: {e}. Falling back to embedding similarity.")
             self.reranker = None
 
     def embed(self, texts):
